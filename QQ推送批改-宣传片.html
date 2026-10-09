@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QQ 推送批改助手 · 宣传片</title>
+<style>
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",
+         "PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --ink:#1C1C1E;
+  --ink-2:rgba(60,60,67,.62);
+  --ink-3:rgba(60,60,67,.36);
+  --ink-2b:rgba(60,60,67,.50);   /* 小字说明：比 --ink-3 再重一档，投到屏幕上也看得清 */
+  --line:rgba(60,60,67,.14);
+  --line-2:rgba(60,60,67,.22);
+  --accent:#007AFF;
+  --accent-ink:#0060DF;
+  --accent-soft:rgba(0,122,255,.10);
+  --bg:#FFFFFF;
+  --grouped:#F7F7F9;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-io:cubic-bezier(.32,.72,0,1);
+  --sh-sm:0 1px 2px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);
+  --sh-md:0 2px 6px rgba(0,0,0,.05),0 12px 32px rgba(0,0,0,.08);
+  --sh-lg:0 8px 24px rgba(0,0,0,.08),0 30px 70px rgba(0,0,0,.14);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;background:#0A0A0B;overflow:hidden;
+  font-family:var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+img{-webkit-user-drag:none;}
+
+/* ---------- 舞台：1280x720 设计稿，整体等比缩放 ---------- */
+.viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden;background:#0A0A0B;}
+.stage{width:1280px;height:720px;flex:none;position:relative;overflow:hidden;
+  background:var(--bg);transform-origin:center center;
+  border-radius:16px;box-shadow:0 40px 110px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06);}
+
+.scene{position:absolute;inset:0;opacity:0;pointer-events:none;
+  transition:opacity .6s var(--ease-io);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 84px;}
+.scene.is-on{opacity:1;pointer-events:auto;}
+
+/* ---------- 入场动画 ---------- */
+.an{animation-fill-mode:both;animation-duration:.82s;animation-timing-function:var(--ease);animation-delay:var(--d,0s);}
+.scene.is-on .an{animation-name:rise;}
+.scene.is-on .an.pop{animation-name:pop;}
+.scene.is-on .an.fade{animation-name:fadeIn;}
+.scene.is-on .an.slide{animation-name:slideIn;}
+.scene.is-on .an.wipe{animation-name:wipe;}
+.scene.is-on .an.draw{animation-name:draw;}
+.stage.is-paused .scene.is-on .an{animation-play-state:paused;}
+
+/* 静帧模式（#still=N）：让每一幕直接停在动画终态。
+   注意无头浏览器里 CSS 过渡那条时钟不跟着 virtual-time 走，
+   不显式关掉的话整屏会停在「过渡起始值」上，拍出来一片灰 ——
+   这是量具的问题，不是样式的问题。 */
+html.is-still .scene{transition:none!important;}
+html.is-still .scene.is-on{opacity:1!important;}
+html.is-still .an{animation:none!important;opacity:1!important;transform:none!important;clip-path:none!important;}
+html.is-still .s1-rule{animation:none!important;width:76px!important;}
+html.is-still .hud{opacity:1!important;transition:none!important;}
+html.is-still .hint{display:none!important;}
+html.is-still .fstep{animation:none!important;opacity:1!important;transform:none!important;}
+html.is-still .fstep .fs-ico{animation:none!important;border-color:var(--accent)!important;
+  color:var(--accent)!important;box-shadow:0 9px 24px rgba(0,122,255,.28)!important;}
+html.is-still .fstep .fs-tick{animation:none!important;opacity:1!important;transform:scale(1)!important;}
+html.is-still .fl-rail .fl-fill{animation:none!important;width:100%!important;}
+html.is-still .fl-rail .fl-dot{animation:none!important;left:100%!important;opacity:1!important;
+  transform:translate(-50%,-50%) scale(1)!important;}
+html.is-still .shot .cursor{animation:none!important;opacity:0!important;}
+html.is-still .shot .rect{animation:none!important;clip-path:none!important;}
+html.is-still .shot .circ{animation:none!important;opacity:1!important;}
+html.is-still .shot .hl{animation:none!important;background:rgba(232,137,12,.26)!important;}
+html.is-still .longmock .lm-line{animation:none!important;stroke-dashoffset:0!important;}
+html.is-still .longmock .lm-anchor{animation:none!important;opacity:1!important;}
+html.is-still .longmock .lm-card{animation:none!important;opacity:1!important;}
+html.is-still .s7 .exp-i{animation:none!important;opacity:1!important;transform:none!important;}
+
+@keyframes rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
+@keyframes pop{from{opacity:0;transform:scale(.955) translateY(10px);}to{opacity:1;transform:none;}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0);}to{clip-path:inset(0 0 0 0);}}
+@keyframes draw{from{stroke-dashoffset:var(--len,300);}to{stroke-dashoffset:0;}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-18px);}to{opacity:1;transform:none;}}
+
+/* ---------- 通用排版 ---------- */
+.kicker{font-size:13px;font-weight:600;letter-spacing:.14em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:22px;}
+.big{font-size:84px;font-weight:700;letter-spacing:-.045em;line-height:1.02;margin:0;color:var(--ink);}
+.mid{font-size:52px;font-weight:700;letter-spacing:-.035em;line-height:1.14;margin:0;color:var(--ink);}
+.sub{font-size:22px;font-weight:400;letter-spacing:-.01em;color:var(--ink-2);margin:22px 0 0;}
+.note{font-size:15px;color:var(--ink-2b);margin:26px 0 0;letter-spacing:.01em;}
+
+.s-head{text-align:center;margin-bottom:34px;}
+.s-head h2{font-size:40px;font-weight:700;letter-spacing:-.032em;margin:0;color:var(--ink);}
+.s-head p{font-size:16px;color:var(--ink-2);margin:11px 0 0;}
+.s-head .step{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.1em;
+  color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:5px 12px;margin-bottom:14px;}
+
+/* ================= S1 封面 ================= */
+.s1-wrap{text-align:center;transform:translateY(-8px);}
+.s1-wrap .big{font-size:92px;}
+.s1-rule{width:0;height:4px;border-radius:9px;background:var(--accent);margin:34px auto 0;}
+.scene.is-on .s1-rule{animation:ruleIn .9s var(--ease) .75s both;}
+@keyframes ruleIn{from{width:0;}to{width:76px;}}
+
+/* ================= S2 痛点 ================= */
+.s2 .ask{font-size:38px;font-weight:600;letter-spacing:-.03em;text-align:center;margin:0 0 46px;color:var(--ink);}
+.s2 .ask em{font-style:normal;color:var(--accent);}
+.pain{display:flex;gap:22px;}
+.pcard{width:250px;background:var(--bg);border:1px solid var(--line);border-radius:18px;
+  padding:26px 22px 22px;box-shadow:var(--sh-sm);text-align:left;}
+.pcard .pic{width:44px;height:44px;border-radius:13px;background:var(--grouped);
+  display:grid;place-items:center;margin-bottom:18px;color:var(--ink-3);}
+.pcard .pic svg{width:23px;height:23px;}
+.pcard b{display:block;font-size:17px;font-weight:600;letter-spacing:-.015em;color:var(--ink);margin-bottom:7px;}
+.pcard span{font-size:13.5px;line-height:1.55;color:var(--ink-3);display:block;}
+.pcard .tag{display:inline-block;margin-top:15px;font-size:12px;font-weight:600;
+  color:#D70015;background:rgba(255,59,48,.09);border-radius:7px;padding:4px 9px;}
+.s2 .turn{margin:44px 0 0;font-size:19px;font-weight:500;color:var(--ink-2);letter-spacing:-.01em;}
+.s2 .turn b{color:var(--ink);font-weight:600;}
+
+/* ================= S3 一句话 ================= */
+.s3{text-align:center;}
+.s3 .mid{font-size:56px;}
+.s3 .mid em{font-style:normal;color:var(--accent);}
+.pills{display:flex;gap:12px;justify-content:center;margin-top:40px;}
+.pill{font-size:15.5px;font-weight:500;letter-spacing:-.005em;color:var(--ink);
+  background:var(--grouped);border-radius:99px;padding:11px 22px;display:flex;align-items:center;gap:8px;}
+.pill svg{width:15px;height:15px;color:var(--accent);flex:none;}
+.pill.on{background:var(--accent);color:#fff;}
+.pill.on svg{color:#fff;}
+
+/* ================= S4 操作流程 ================= */
+.flow{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;
+  width:100%;max-width:1000px;margin-top:10px;}
+.fl-rail{position:absolute;left:11.6%;right:11.6%;top:34px;height:2px;background:var(--line);
+  border-radius:2px;}
+.fl-rail .fl-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:2px;background:var(--accent);}
+.fl-rail .fl-dot{position:absolute;top:50%;left:0;width:9px;height:9px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 4px rgba(0,122,255,.16);
+  transform:translate(-50%,-50%) scale(.6);opacity:0;}
+.fstep{position:relative;z-index:1;text-align:center;opacity:0;}
+.fstep .fs-ico{position:relative;width:68px;height:68px;margin:0 auto;border-radius:20px;
+  background:#fff;border:1px solid var(--line);box-shadow:var(--sh-sm);
+  display:grid;place-items:center;color:var(--ink-3);}
+.fstep .fs-ico svg{width:27px;height:27px;}
+.fstep>b{display:block;margin-top:15px;font-size:17px;font-weight:600;
+  color:var(--ink);letter-spacing:-.02em;}
+.fstep>span{display:block;margin-top:6px;font-size:13px;line-height:1.5;color:var(--ink-2b);
+  padding:0 6px;}
+.fstep .fs-tick{position:absolute;right:-4px;top:-4px;width:21px;height:21px;border-radius:50%;
+  background:var(--accent);color:#fff;display:grid;place-items:center;
+  box-shadow:0 2px 8px rgba(0,122,255,.4);opacity:0;transform:scale(.4);}
+.fstep .fs-tick svg{width:11px;height:11px;}
+
+.scene.is-on .fstep{animation:fsIn .6s var(--ease) var(--sd) both;}
+.scene.is-on .fstep .fs-ico{animation:fsRing .85s var(--ease) var(--sd) both;}
+.scene.is-on .fstep .fs-tick{animation:fsTick .4s var(--ease) calc(var(--sd) + .46s) both;}
+.scene.is-on .fl-rail .fl-fill{animation:flGrow 3.7s linear .5s both;}
+.scene.is-on .fl-rail .fl-dot{animation:flMove 3.7s linear .5s both;}
+@keyframes fsIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+@keyframes fsRing{
+  from{box-shadow:0 0 0 0 rgba(0,122,255,.34),var(--sh-sm);border-color:var(--line);color:var(--ink-3);}
+  to{box-shadow:0 0 0 0 rgba(0,122,255,0),0 9px 24px rgba(0,122,255,.28);border-color:var(--accent);color:var(--accent);}}
+@keyframes fsTick{from{opacity:0;transform:scale(.4);}to{opacity:1;transform:scale(1);}}
+@keyframes flGrow{from{width:0;}to{width:100%;}}
+@keyframes flMove{
+  0%{left:0;opacity:0;transform:translate(-50%,-50%) scale(.6);}
+  6%{opacity:1;}
+  100%{left:100%;opacity:1;transform:translate(-50%,-50%) scale(1);}}
+
+/* ================= 应用窗口还原（S4） ================= */
+.appwrap{width:100%;max-width:940px;}
+.app{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--line);
+  box-shadow:var(--sh-lg);}
+.app-bar{height:40px;display:flex;align-items:center;gap:7px;padding:0 14px;
+  background:var(--grouped);border-bottom:1px solid var(--line);}
+.tl{width:11px;height:11px;border-radius:50%;background:#DCDCE0;flex:none;}
+.tl:nth-child(1){background:#FF5F57;} .tl:nth-child(2){background:#FEBC2E;} .tl:nth-child(3){background:#28C840;}
+.app-title{margin-left:12px;font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:-.005em;}
+.app-saved{margin-left:auto;font-size:11.5px;color:var(--ink-3);}
+.app-btn{font-size:11.5px;font-weight:600;color:#fff;background:var(--accent);border-radius:7px;padding:5px 11px;margin-left:9px;}
+.app-btn.gh{background:var(--grouped);color:var(--ink-2);}
+
+.app-body{display:grid;grid-template-columns:186px 1fr 194px;height:414px;}
+.app-left{border-right:1px solid var(--line);padding:11px;display:flex;flex-direction:column;gap:7px;background:#FCFCFD;}
+.app-new{font-size:12px;font-weight:600;color:#fff;background:var(--accent);border-radius:9px;padding:9px 12px;text-align:center;}
+.app-new.gh{background:var(--grouped);color:var(--ink-2);font-weight:500;}
+.app-doc{margin-top:7px;border-radius:9px;padding:8px 10px;}
+.app-doc b{display:block;font-size:11.5px;font-weight:600;color:var(--ink);}
+.app-doc em{display:block;font-style:normal;font-size:10.5px;color:var(--ink-3);margin-top:3px;}
+.app-doc.on{background:var(--accent-soft);}
+.app-doc.on b{color:var(--accent-ink);}
+.app-who{margin-top:auto;font-size:11px;color:var(--ink-2);padding:8px 4px 0;border-top:1px solid var(--line);}
+
+.app-mid{padding:12px 16px;display:flex;flex-direction:column;gap:11px;background:var(--grouped);}
+.app-tools{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--line);
+  border-radius:9px;padding:5px 7px;box-shadow:var(--sh-sm);}
+.app-tools i{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--ink-2);}
+.app-tools i svg{width:14px;height:14px;}
+.app-tools i.on{background:var(--accent);color:#fff;}
+.app-tools .sp{flex:1;}
+.app-tools .sep{width:1px;height:16px;background:var(--line-2);margin:0 3px;}
+.app-tools .dotC{width:11px;height:11px;border-radius:50%;}
+
+.shot{flex:1;background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+  box-shadow:var(--sh-sm);position:relative;overflow:hidden;}
+.shot-hd{display:flex;align-items:center;gap:7px;margin-bottom:11px;}
+.shot-hd .av{width:17px;height:17px;border-radius:50%;background:linear-gradient(135deg,#8FC6FF,#007AFF);flex:none;}
+.shot-hd b{font-size:10.5px;font-weight:600;color:var(--ink-3);}
+.shot p{margin:0 0 7px;font-size:12.5px;line-height:1.55;color:#2C2C2E;letter-spacing:-.005em;}
+.shot p.t{font-size:13.5px;font-weight:600;}
+.shot .rect{position:relative;border:2px solid #FF3B30;background:rgba(255,59,48,.07);
+  border-radius:3px;padding:1px 3px;margin:0 -1px;}
+.shot .rect .bd{position:absolute;top:-9px;right:-9px;width:16px;height:16px;border-radius:50%;
+  background:#FF3B30;color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.22);}
+.shot .circ{border:2px solid #AF52DE;border-radius:50%;padding:0 5px;display:inline-block;
+  transform:rotate(-3deg);}
+.shot .hl{background:rgba(232,137,12,.26);border-radius:3px;padding:1px 2px;}
+/* ---- S4 动效：把「粘图 → 圈画 → 弹意见框」演一遍 ---- */
+.shot .cursor{position:absolute;left:22%;top:56%;width:13px;height:13px;border-radius:50%;
+  background:rgba(0,122,255,.55);border:2px solid #fff;
+  box-shadow:0 2px 9px rgba(0,0,0,.28);opacity:0;pointer-events:none;}
+.scene.is-on .shot .cursor{animation:curMove 1.5s var(--ease) .95s both;}
+@keyframes curMove{
+  0%{opacity:0;left:22%;top:56%;}
+  14%{opacity:1;}
+  58%{left:55%;top:59%;}
+  100%{opacity:0;left:57%;top:60%;}}
+.scene.is-on .shot .rect{animation:rectDraw .9s var(--ease) 1.1s both;}
+@keyframes rectDraw{from{clip-path:inset(0 100% 0 0);}to{clip-path:inset(0 0 0 0);}}
+.scene.is-on .shot .circ{animation:fadeIn .5s var(--ease) 2.3s both;}
+.scene.is-on .shot .hl{animation:hlIn .55s var(--ease) 2.55s both;}
+@keyframes hlIn{from{background:transparent;}to{background:rgba(232,137,12,.26);}}
+
+.app-note{background:#fff;border:1px solid var(--accent);border-radius:11px;padding:11px 13px;
+  box-shadow:0 6px 20px rgba(0,122,255,.14);}
+.app-note .t{display:inline-block;font-size:10.5px;font-weight:600;color:#A35B00;
+  background:rgba(255,149,0,.16);border-radius:6px;padding:3px 8px;margin-bottom:8px;}
+.app-note .b{font-size:11.5px;line-height:1.5;color:var(--ink);}
+.app-note .s{margin-top:7px;font-size:11px;color:var(--ink-2);}
+.app-note .s b{color:var(--accent-ink);font-weight:600;}
+
+.app-right{border-left:1px solid var(--line);padding:12px 11px;background:#FCFCFD;}
+.app-right .hd{font-size:11.5px;font-weight:600;color:var(--ink-2);margin-bottom:10px;letter-spacing:-.005em;}
+.app-item{display:flex;gap:8px;padding:8px 8px;border-radius:9px;background:#fff;
+  border:1px solid var(--line);margin-bottom:7px;}
+.app-item i{flex:none;width:17px;height:17px;border-radius:50%;background:var(--c);
+  color:#fff;font-style:normal;font-size:9.5px;font-weight:700;display:grid;place-items:center;}
+.app-item b{display:block;font-size:11px;font-weight:600;color:var(--ink);}
+.app-item span{display:block;font-size:10.5px;color:var(--ink-2b);margin-top:2px;line-height:1.4;}
+
+.callouts{position:static;}
+.co{position:absolute;font-size:11.5px;font-weight:600;color:var(--accent-ink);
+  background:#fff;border:1px solid rgba(0,122,255,.3);border-radius:99px;padding:6px 12px;
+  box-shadow:var(--sh-md);white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.co::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;}
+.co.c1{right:16px;top:288px;}
+.co.c2{right:16px;top:410px;}
+.co.c3{left:16px;top:520px;}
+
+/* ================= S5 工具 ================= */
+.tools{display:grid;grid-template-columns:repeat(8,1fr);gap:12px;width:100%;max-width:1020px;}
+.tool{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 8px 15px;
+  text-align:center;box-shadow:var(--sh-sm);}
+.tool svg{width:26px;height:26px;color:var(--accent);}
+.tool b{display:block;font-size:12.5px;font-weight:600;color:var(--ink);margin-top:11px;letter-spacing:-.01em;}
+.s5-foot{display:flex;gap:36px;margin-top:38px;align-items:center;}
+.fchip{text-align:center;}
+.fchip b{display:block;font-size:26px;font-weight:700;letter-spacing:-.03em;color:var(--ink);}
+.fchip span{display:block;font-size:12.5px;color:var(--ink-2b);margin-top:5px;}
+.fchip b em{font-style:normal;font-size:16px;font-weight:600;color:var(--ink-2);}
+
+/* ================= S6 意见框 ================= */
+.s6-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center;
+  width:100%;max-width:1020px;}
+.ty-col{display:flex;flex-direction:column;gap:30px;}
+.ty-lead{margin:0;font-size:16.5px;line-height:1.72;color:var(--ink-2);letter-spacing:-.01em;}
+.types{display:flex;flex-wrap:wrap;gap:11px;}
+.ty{font-size:14px;font-weight:600;border-radius:99px;padding:9px 18px;letter-spacing:-.005em;
+  background:var(--tb);color:var(--ti);}
+.ty.on{background:var(--tc);color:#fff;}
+.composer{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+  box-shadow:var(--sh-lg);}
+.cp-bar{height:36px;display:flex;align-items:center;padding:0 15px;background:var(--grouped);
+  border-bottom:1px solid var(--line);font-size:11.5px;font-weight:600;color:var(--ink-2);}
+.cp-body{padding:15px 16px;}
+.cp-row{display:flex;gap:9px;margin-bottom:11px;}
+.cp-lab{font-size:11.5px;color:var(--ink-3);width:52px;flex:none;padding-top:7px;}
+.cp-val{flex:1;font-size:12.5px;color:var(--ink);background:var(--grouped);
+  border-radius:8px;padding:8px 11px;line-height:1.5;border:1px solid transparent;}
+.cp-val.focus{background:var(--accent-soft);border-color:rgba(0,122,255,.28);}
+.cp-foot{display:flex;justify-content:flex-end;gap:9px;padding:0 16px 15px;}
+.cp-btn{font-size:12px;font-weight:600;border-radius:8px;padding:8px 16px;background:var(--grouped);color:var(--ink-2);}
+.cp-btn.p{background:var(--accent);color:#fff;}
+
+/* ================= S7 导出 ================= */
+.s7{display:grid;grid-template-columns:1fr 356px;gap:56px;align-items:center;
+  width:100%;max-width:1060px;}
+.exp{display:flex;flex-direction:column;gap:9px;}
+.exp-i{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);
+  border-radius:13px;padding:13px 17px;box-shadow:var(--sh-sm);}
+.exp-i svg{width:19px;height:19px;color:var(--accent);flex:none;}
+.exp-i b{font-size:14.5px;font-weight:600;color:var(--ink);letter-spacing:-.012em;}
+.exp-i span{font-size:12px;color:var(--ink-3);margin-left:auto;}
+.exp-i.hero{background:var(--accent);border-color:var(--accent);box-shadow:0 8px 26px rgba(0,122,255,.28);}
+.exp-i.hero svg{color:#fff;} .exp-i.hero b{color:#fff;} .exp-i.hero span{color:rgba(255,255,255,.8);}
+.longmock{position:relative;width:340px;height:300px;}
+.lm-card{position:absolute;width:124px;background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:9px 11px;box-shadow:var(--sh-sm);}
+.lm-card i{display:block;font-style:normal;font-size:9.5px;font-weight:700;color:#fff;
+  width:15px;height:15px;border-radius:50%;background:var(--c);text-align:center;line-height:15px;margin-bottom:5px;}
+.lm-card b{display:block;font-size:9.5px;font-weight:600;color:var(--ink);}
+.lm-card span{display:block;font-size:9px;color:var(--ink-3);margin-top:3px;line-height:1.4;}
+.lm-img{position:absolute;left:138px;top:16px;width:64px;height:268px;border-radius:8px;
+  background:var(--grouped);border:1px solid var(--line);padding:9px 7px;}
+.lm-img u{display:block;height:4px;border-radius:2px;background:rgba(60,60,67,.16);margin-bottom:6px;
+  text-decoration:none;}
+.lm-img u.s{width:60%;}
+.longmock svg{position:absolute;inset:0;overflow:visible;}
+/* ---- S7：长图引线依次画出，卡片逐张落下 ---- */
+.longmock .lm-line{stroke-dasharray:1;stroke-dashoffset:1;}
+.scene.is-on .longmock .lm-line{animation:lmDraw .45s var(--ease) both;
+  animation-delay:calc(.8s + var(--k) * .12s);}
+@keyframes lmDraw{to{stroke-dashoffset:0;}}
+.longmock .lm-anchor{opacity:0;}
+.scene.is-on .longmock .lm-anchor{animation:fadeIn .35s var(--ease) both;
+  animation-delay:calc(1.18s + var(--k) * .12s);}
+.longmock .lm-card{opacity:0;}
+.scene.is-on .longmock .lm-card{animation:pop .5s var(--ease) both;
+  animation-delay:calc(1.28s + var(--k) * .14s);}
+.s7 h2 em{font-style:normal;color:var(--accent);}
+.s7 .s-head p b{color:var(--accent);font-weight:600;}
+
+/* ================= S8 收尾 ================= */
+.s8{text-align:center;}
+.s8 .big{font-size:74px;}
+.s8 .url{display:inline-flex;align-items:center;gap:9px;margin-top:30px;font-size:17px;font-weight:600;
+  color:var(--accent-ink);background:var(--accent-soft);border-radius:99px;padding:12px 24px;letter-spacing:-.01em;}
+.s8 .url svg{width:16px;height:16px;}
+.s8 .sign{margin-top:44px;font-size:13.5px;color:var(--ink-3);line-height:1.9;}
+.s8 .sign b{display:block;color:var(--ink-2);font-weight:600;letter-spacing:-.005em;}
+
+/* ---------- HUD ---------- */
+.hud{position:fixed;left:0;right:0;bottom:0;padding:26px 30px 22px;z-index:20;
+  background:linear-gradient(to top,rgba(0,0,0,.5),rgba(0,0,0,0));
+  display:flex;align-items:center;gap:18px;
+  transition:opacity .45s var(--ease);}
+.hud.idle{opacity:.22;}
+.hud:hover{opacity:1!important;}
+.pbtn{width:44px;height:44px;border-radius:50%;border:0;flex:none;cursor:pointer;
+  background:rgba(255,255,255,.16);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  color:#fff;display:grid;place-items:center;transition:transform .16s var(--ease),background .2s;}
+.pbtn:hover{background:rgba(255,255,255,.26);}
+.pbtn:active{transform:scale(.93);}
+.pbtn svg{width:17px;height:17px;}
+.pbtn .i-play{display:none;} .pbtn.paused .i-pause{display:none;} .pbtn.paused .i-play{display:block;}
+
+.track{flex:1;position:relative;padding:9px 0;cursor:pointer;}
+.track .rail{height:4px;border-radius:9px;background:rgba(255,255,255,.2);position:relative;overflow:hidden;}
+.track .fill{position:absolute;left:0;top:0;bottom:0;background:#fff;border-radius:9px;width:0;}
+.track .dots{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
+  display:flex;pointer-events:none;}
+.track .dots i{flex:1;position:relative;}
+.track .dots i::after{content:"";position:absolute;right:0;top:-3px;width:1px;height:10px;
+  background:rgba(255,255,255,.32);}
+.track .dots i:last-child::after{display:none;}
+
+.chips{display:flex;gap:9px;flex:none;}
+.chip{font-size:11.5px;font-weight:500;color:rgba(255,255,255,.52);background:transparent;border:0;
+  cursor:pointer;padding:4px 2px;border-bottom:2px solid transparent;transition:color .2s;font-family:var(--font);}
+.chip:hover{color:rgba(255,255,255,.85);}
+.chip.on{color:#fff;border-bottom-color:#fff;font-weight:600;}
+.tc{font-size:12.5px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.62);flex:none;min-width:78px;text-align:right;}
+
+.hint{position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:20;
+  font-size:12.5px;color:rgba(255,255,255,.72);background:rgba(255,255,255,.1);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-radius:99px;padding:8px 18px;letter-spacing:.01em;
+  animation:hintOut .8s var(--ease) 4.6s both;pointer-events:none;}
+@keyframes hintOut{to{opacity:0;transform:translateX(-50%) translateY(-8px);}}
+
+@media (max-width:760px){
+  .hud{padding:16px 14px 14px;gap:11px;}
+  .chips{display:none;} .tc{min-width:auto;font-size:11px;}
+  .hint{font-size:11px;padding:6px 13px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .an{animation-duration:.01s!important;}
+}
+</style>
+</head>
+<body>
+<div class="viewport" id="viewport">
+<div class="stage" id="stage">
+
+  <!-- ============ S1 封面 ============ -->
+  <section class="scene s1" data-dur="4800" data-name="开场">
+    <div class="s1-wrap">
+      <div class="kicker" style="--d:.15s">南京农业大学智慧农业学院（人工智能学院）</div>
+      <h1 class="big" style="--d:.32s">QQ 推送批改助手</h1>
+      <p class="sub" style="--d:.56s">让每一条推送，都改得明明白白</p>
+      <div class="s1-rule"></div>
+    </div>
+  </section>
+
+  <!-- ============ S2 痛点 ============ -->
+  <section class="scene s2" data-dur="6200" data-name="痛点">
+    <p class="ask an">一份推送稿摆在面前，你打算<em>怎么改</em>？</p>
+    <div class="pain">
+      <div class="pcard an" style="--d:.30s">
+        <div class="pic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v14H7l-4 4z"/><path d="M8 8h8M8 12h5"/></svg></div>
+        <b>截图乱圈</b><span>手机上用手指划两道，再配一句“你看这里”</span>
+        <div class="tag">说不清</div>
+      </div>
+      <div class="pcard an" style="--d:.42s">
+        <div class="pic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v4"/></svg></div>
+        <b>语音一条条</b><span>连着发五段语音，得反复听、来回对</span>
+        <div class="tag">对不上</div>
+      </div>
+      <div class="pcard an" style="--d:.54s">
+        <div class="pic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+        <b>打字复述</b><span>把原文抄一遍再标哪里有毛病，慢还容易漏</span>
+        <div class="tag">找不到</div>
+      </div>
+    </div>
+    <p class="turn an" style="--d:1.05s">于是，我们做了<b>它</b></p>
+  </section>
+
+  <!-- ============ S3 一句话 ============ -->
+  <section class="scene s3" data-dur="4000" data-name="一句话">
+    <h2 class="mid an" style="--d:.12s">一个 HTML 文件，<em>双击就开</em></h2>
+    <div class="pills">
+      <div class="pill an fade" style="--d:.44s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>无需安装</div>
+      <div class="pill an fade" style="--d:.54s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>无需登录</div>
+      <div class="pill on an fade" style="--d:.64s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>完全离线</div>
+    </div>
+    <p class="note an fade" style="--d:1.0s">就一个文件，放桌面，随时能用 · 数据只存在你自己的浏览器里</p>
+  </section>
+
+  <!-- ============ S4 操作流程 ============ -->
+  <section class="scene sflow" data-dur="6600" data-name="操作流程">
+    <div class="s-head an" style="--d:.06s">
+      <div class="step">总览</div>
+      <h2>四步，走完一次批改</h2>
+      <p>从一张截图，到一条能直接发出去的批改</p>
+    </div>
+    <div class="flow">
+      <div class="fl-rail"><i class="fl-fill"></i><span class="fl-dot"></span></div>
+      <div class="fstep" style="--sd:.50s">
+        <div class="fs-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1.5"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+          <span class="fs-tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        </div>
+        <b>粘图</b><span>截图 Ctrl + V 直接粘，或拖进来</span>
+      </div>
+      <div class="fstep" style="--sd:1.55s">
+        <div class="fs-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/></svg>
+          <span class="fs-tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        </div>
+        <b>圈画</b><span>圈、框、箭头，八种工具随手画</span>
+      </div>
+      <div class="fstep" style="--sd:2.60s">
+        <div class="fs-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></svg>
+          <span class="fs-tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        </div>
+        <b>写意见</b><span>画完自动弹框，挑类型写建议</span>
+      </div>
+      <div class="fstep" style="--sd:3.65s">
+        <div class="fs-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V7"/><path d="m7 12 5-5 5 5"/><path d="M5 21h14"/></svg>
+          <span class="fs-tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        </div>
+        <b>导出</b><span>多种方式任选，直接发出去</span>
+      </div>
+    </div>
+    <p class="note an fade" style="--d:4.35s">每一步都落在同一张图上 —— 改完直接发</p>
+  </section>
+
+  <!-- ============ S4 图片批改 ============ -->
+  <section class="scene s4" data-dur="7400" data-name="图片批改">
+    <div class="s-head an" style="--d:.1s">
+      <div class="step">01</div>
+      <h2>打开就是图片批改</h2>
+      <p>截图扔进去，直接在图上圈点勾画，画完就写意见</p>
+    </div>
+    <div class="appwrap callouts">
+      <div class="app an pop" style="--d:.3s">
+        <div class="app-bar">
+          <span class="tl"></span><span class="tl"></span><span class="tl"></span>
+          <span class="app-title">2026 秋季纳新推送</span>
+          <span class="app-saved">已保存</span>
+          <span class="app-btn">保存</span>
+          <span class="app-btn gh">导出</span>
+        </div>
+        <div class="app-body">
+          <aside class="app-left">
+            <div class="app-new">＋ 图片批改</div>
+            <div class="app-new gh">＋ 文字推送</div>
+            <div class="app-doc on"><b>2026 秋季纳新推送</b><em>图 · 3 条批注</em></div>
+            <div class="app-doc"><b>招新宣讲通稿</b><em>文 · 6 条批注</em></div>
+            <div class="app-who">李小明　批注人</div>
+          </aside>
+          <main class="app-mid">
+            <div class="app-tools">
+              <i class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 7-6 1.6L10.5 19z"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="7.5"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5"/><path d="M12 5h7v7"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 15l8-6"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.6 6.5-10.5a6.5 6.5 0 1 0-13 0C5.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg></i>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></i>
+              <span class="sp"></span>
+              <span class="sep"></span>
+              <span class="dotC" style="background:#FF3B30"></span>
+              <span class="dotC" style="background:#FF9500;box-shadow:0 0 0 2px var(--accent);"></span>
+              <span class="dotC" style="background:#34C759"></span>
+              <span class="dotC" style="background:#007AFF"></span>
+              <span class="sep"></span>
+              <i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></i>
+            </div>
+            <div class="shot">
+              <div class="shot-hd"><span class="av"></span><b>智慧农业学院 · 组织部</b></div>
+              <p class="t">2026 年秋季纳新正式启动</p>
+              <p><span class="circ">Part 1</span>　招新宣讲</p>
+              <p>时间：9 月 12 日 19:00</p>
+              <p>地点：大学生活动中心</p>
+              <p>我们期待与你在智慧农业的世界里相遇，<span class="rect">一起把青春拉满<em class="bd">1</em></span>！</p>
+              <p><span class="hl">提前把推送写细一点，大家才好理解</span></p>
+              <span class="cursor"></span>
+            </div>
+            <div class="app-note an pop" style="--d:1.95s">
+              <span class="t">措辞</span>
+              <div class="b">“拉满”这个词 AI 味道有些浓，换成校媒惯用的说法更稳妥</div>
+              <div class="s">建议改成：<b>一起把青春铺展在田间地头</b></div>
+            </div>
+          </main>
+          <aside class="app-right">
+            <div class="hd">批注清单</div>
+            <div class="app-item" style="--c:#FF9500"><i>1</i><div><b>措辞</b><span>“拉满”AI 味道有些浓</span></div></div>
+            <div class="app-item" style="--c:#AF52DE"><i>2</i><div><b>格式</b><span>不建议使用英文 Part</span></div></div>
+            <div class="app-item" style="--c:#8E8E93"><i>3</i><div><b>整体</b><span>提前写的推送别过度细化</span></div></div>
+          </aside>
+        </div>
+      </div>
+      <div class="co c1 an fade" style="--d:1.2s">截图 Ctrl + V 直接粘</div>
+      <div class="co c2 an fade" style="--d:1.35s">画完自动弹意见框</div>
+      <div class="co c3 an fade" style="--d:1.5s">批注人一次设置</div>
+    </div>
+  </section>
+
+  <!-- ============ S5 工具 ============ -->
+  <section class="scene s5" data-dur="6600" data-name="工具">
+    <div class="s-head an" style="--d:.08s">
+      <div class="step">02</div>
+      <h2>八种工具，随手就画</h2>
+      <p>圈、框、箭头、涂画都齐了，手机上还能捏合缩放</p>
+    </div>
+    <div class="tools">
+      <div class="tool an pop" style="--d:.24s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 7-6 1.6L10.5 19z"/></svg><b>选择</b></div>
+      <div class="tool an pop" style="--d:.31s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/></svg><b>方框</b></div>
+      <div class="tool an pop" style="--d:.38s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7.5"/></svg><b>圆圈</b></div>
+      <div class="tool an pop" style="--d:.45s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5"/><path d="M12 5h7v7"/></svg><b>箭头</b></div>
+      <div class="tool an pop" style="--d:.52s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></svg><b>画笔</b></div>
+      <div class="tool an pop" style="--d:.59s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 15l8-6"/></svg><b>高亮框</b></div>
+      <div class="tool an pop" style="--d:.66s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.6 6.5-10.5a6.5 6.5 0 1 0-13 0C5.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg><b>标点</b></div>
+      <div class="tool an pop" style="--d:.73s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><b>平移</b></div>
+    </div>
+    <div class="s5-foot">
+      <div class="fchip an fade" style="--d:1.0s"><b>6 <em>色</em></b><span>红橙黄绿蓝紫 · 可自定义取色</span></div>
+      <div class="fchip an fade" style="--d:1.1s"><b>3 <em>档</em></b><span>细 / 中 / 粗</span></div>
+      <div class="fchip an fade" style="--d:1.2s"><b>15%–800%</b><span>缩放 · 双指捏合 · Ctrl+滚轮</span></div>
+      <div class="fchip an fade" style="--d:1.3s"><b>原比例</b><span>默认按原始尺寸打开，不变形</span></div>
+    </div>
+  </section>
+
+  <!-- ============ S6 意见框 ============ -->
+  <section class="scene s6" data-dur="6200" data-name="写意见">
+    <div class="s-head an" style="--d:.08s">
+      <div class="step">03</div>
+      <h2>挑个类型，写句人话</h2>
+      <p>错别字、措辞、格式、表情、赞赏、整体 —— 分好类，对方一眼看得懂</p>
+    </div>
+    <div class="s6-grid">
+      <div class="ty-col">
+      <p class="ty-lead an" style="--d:.20s">给每条意见挑一个归属，<br>一眼就知道你指的是哪一类问题。</p>
+      <div class="types">
+        <span class="ty on an pop" style="--d:.26s;--tc:#FF3B30">错别字</span>
+        <span class="ty on an pop" style="--d:.33s;--tc:#FF9500">措辞</span>
+        <span class="ty on an pop" style="--d:.40s;--tc:#AF52DE">格式</span>
+        <span class="ty on an pop" style="--d:.47s;--tc:#32ADE6">表情</span>
+        <span class="ty on an pop" style="--d:.54s;--tc:#34C759">赞赏</span>
+        <span class="ty on an pop" style="--d:.61s;--tc:#8E8E93">整体</span>
+      </div>
+      </div>
+      <div class="composer an pop" style="--d:.4s">
+        <div class="cp-bar">意见框 · 1 / 3</div>
+        <div class="cp-body">
+          <div class="cp-row"><span class="cp-lab">类型</span><span class="cp-val" style="color:#A35B00;font-weight:600;background:rgba(255,149,0,.16)">措辞</span></div>
+          <div class="cp-row"><span class="cp-lab">意见</span><span class="cp-val focus">“拉满”这个词 AI 味道有些浓，换成校媒惯用的说法更稳妥</span></div>
+          <div class="cp-row"><span class="cp-lab">建议改成</span><span class="cp-val">一起把青春铺展在田间地头</span></div>
+        </div>
+        <div class="cp-foot"><span class="cp-btn">取消</span><span class="cp-btn p">提交</span></div>
+      </div>
+    </div>
+    <p class="note an fade" style="--d:1.1s">每条带意见的标注都会在图上打一个编号，和右侧清单一一对应</p>
+  </section>
+
+  <!-- ============ S7 导出 ============ -->
+  <section class="scene s7" data-dur="7000" data-name="导出">
+    <div>
+      <div class="s-head an" style="--d:.08s;text-align:left;margin-bottom:26px;">
+        <div class="step">04</div>
+        <h2 style="font-size:36px">一键导出，<em>多种方式</em>任选</h2>
+        <p>长图 · PDF · JSON · 纯文本 —— <b>六种导出方式</b>，想怎么发就怎么发</p>
+      </div>
+      <div class="exp">
+        <div class="exp-i hero an slide" style="--d:.26s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 15l5-5 4 4 3-3 6 6"/></svg><b>长图 · 标注 + 图下意见清单</b><span>最常用</span></div>
+        <div class="exp-i an slide" style="--d:.35s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M17 5v4M15 7h4"/></svg><b>长图 · 两侧索引线</b><span>两栏自动配平</span></div>
+        <div class="exp-i an slide" style="--d:.44s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><b>长图 · 就近索引（贴图）</b><span>意见集中时</span></div>
+        <div class="exp-i an slide" style="--d:.53s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="6" y="13" width="12" height="8" rx="2"/><path d="M6 17H4v-6h16v6h-2"/></svg><b>打印 / 存为 PDF</b><span>正式存档</span></div>
+        <div class="exp-i an slide" style="--d:.62s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg><b>JSON 存档 · 导出 / 导入</b><span>换设备接着改</span></div>
+        <div class="exp-i an slide" style="--d:.71s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="4" rx="1.5"/><path d="M8 5H6v16h12V5h-2"/></svg><b>复制纯文本意见</b><span>直接粘回 QQ</span></div>
+      </div>
+    </div>
+    <div class="longmock an pop" style="--d:.6s">
+      <svg viewBox="0 0 340 300">
+        <path class="lm-line" pathLength="1" style="--k:0" d="M128 62 H136 L150 96" fill="none" stroke="#FF9500" stroke-width="1.4" opacity=".75"/>
+        <path class="lm-line" pathLength="1" style="--k:1" d="M128 190 H136 L150 198" fill="none" stroke="#AF52DE" stroke-width="1.4" opacity=".75"/>
+        <path class="lm-line" pathLength="1" style="--k:2" d="M212 118 H204 L190 140" fill="none" stroke="#34C759" stroke-width="1.4" opacity=".75"/>
+        <path class="lm-line" pathLength="1" style="--k:3" d="M212 246 H204 L190 232" fill="none" stroke="#007AFF" stroke-width="1.4" opacity=".75"/>
+        <circle class="lm-anchor" style="--k:0" cx="150" cy="96" r="3" fill="#FF9500"/>
+        <circle class="lm-anchor" style="--k:1" cx="150" cy="198" r="3" fill="#AF52DE"/>
+        <circle class="lm-anchor" style="--k:2" cx="190" cy="140" r="3" fill="#34C759"/>
+        <circle class="lm-anchor" style="--k:3" cx="190" cy="232" r="3" fill="#007AFF"/>
+      </svg>
+      <div class="lm-card" style="left:4px;top:36px;--c:#FF9500;--k:0">
+        <i>1</i><b>措辞</b><span>“拉满”AI 味道有些浓</span>
+      </div>
+      <div class="lm-card" style="left:4px;top:164px;--c:#AF52DE;--k:1">
+        <i>2</i><b>格式</b><span>不建议使用英文 Part</span>
+      </div>
+      <div class="lm-card" style="left:212px;top:92px;--c:#34C759;--k:2">
+        <i>3</i><b>赞赏</b><span>这个开头很有精神</span>
+      </div>
+      <div class="lm-card" style="left:212px;top:220px;--c:#007AFF;--k:3">
+        <i>4</i><b>整体</b><span>提前写的推送别过度细化</span>
+      </div>
+      <div class="lm-img">
+        <u></u><u class="s"></u><u></u><u class="s"></u><u></u><u></u><u class="s"></u>
+        <u></u><u></u><u class="s"></u><u></u><u class="s"></u><u></u><u></u>
+        <u class="s"></u><u></u><u></u><u class="s"></u><u></u><u></u><u class="s"></u>
+        <u></u><u></u><u class="s"></u><u></u>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S8 收尾 ============ -->
+  <section class="scene s8" data-dur="5200" data-name="结束">
+    <h1 class="big an" style="--d:.14s">QQ 推送批改助手</h1>
+    <div class="url an pop" style="--d:.5s">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+      qqchecker.tengkong.top
+    </div>
+    <div class="sign an fade" style="--d:.85s">
+      <b>南京农业大学智慧农业学院（人工智能学院）团委组织部</b>
+      单文件 · 完全离线 · 打开就能用
+    </div>
+  </section>
+
+</div>
+
+<div class="hint">空格 暂停 / 继续　·　← → 切换章节　·　点画面也可暂停</div>
+
+<div class="hud" id="hud">
+  <button class="pbtn paused" id="btnPlay" type="button" aria-label="播放 / 暂停">
+    <svg class="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9.5 5v14M14.5 5v14"/></svg>
+    <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6L19 12z"/></svg>
+  </button>
+  <div class="track" id="track">
+    <div class="rail"><div class="fill" id="fill"></div></div>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="tc" id="tc">00:00 / 00:00</div>
+</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var stage  = document.getElementById('stage');
+  var viewport = document.getElementById('viewport');
+  var scenes = [].slice.call(document.querySelectorAll('.scene'));
+  var durs   = scenes.map(function (s) { return parseInt(s.dataset.dur, 10) || 4000; });
+  var starts = [], acc = 0;
+  durs.forEach(function (d) { starts.push(acc); acc += d; });
+  var total = acc;
+
+  var bar   = document.getElementById('track');
+  var fill  = document.getElementById('fill');
+  var btn   = document.getElementById('btnPlay');
+  var tc    = document.getElementById('tc');
+  var dots  = document.getElementById('dots');
+  var chips = document.getElementById('chips');
+
+  /* 章节刻度 + 章节按钮 */
+  durs.forEach(function (d, i) {
+    var seg = document.createElement('i');
+    seg.style.flex = String(d);
+    dots.appendChild(seg);
+
+    var c = document.createElement('button');
+    c.type = 'button';
+    c.className = 'chip';
+    c.textContent = scenes[i].dataset.name || String(i + 1);
+    c.addEventListener('click', function (e) {
+      e.stopPropagation();
+      seek(starts[i] + 30);
+      play(true);
+    });
+    chips.appendChild(c);
+    c.dataset.idx = String(i);
+  });
+  var chipEls = [].slice.call(chips.children);
+
+  var i = -1, t = 0, playing = false, last = 0;
+
+  function fmt(ms) {
+    ms = Math.max(0, ms);
+    var s = Math.round(ms / 1000);
+    return ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
+  function show(n) {
+    if (n === i) return;
+    i = n;
+    scenes.forEach(function (s, k) { s.classList.toggle('is-on', k === n); });
+    chipEls.forEach(function (c, k) { c.classList.toggle('on', k === n); });
+  }
+
+  function play(p) {
+    playing = p;
+    stage.classList.toggle('is-paused', !p);
+    btn.classList.toggle('paused', !p);
+  }
+
+  function paint() {
+    fill.style.width = (total ? (t / total * 100) : 0) + '%';
+    tc.textContent = fmt(t) + ' / ' + fmt(total);
+  }
+
+  function seek(ms) {
+    t = Math.max(0, Math.min(total - 1, ms));
+    var n = 0;
+    while (n < starts.length - 1 && t >= starts[n + 1]) n++;
+    show(n);
+    paint();
+  }
+
+  function idxAt(ms) {
+    var n = 0;
+    while (n < starts.length - 1 && ms >= starts[n + 1]) n++;
+    return n;
+  }
+
+  /* 推进一帧。单独抽成函数，是为了让自检能直接喂 dt 验时间轴 ——
+     无头浏览器里 rAF 的时钟不跟着 virtual-time 走，只能绕开它。 */
+  function advance(dt) {
+    if (!playing) return;
+    t += dt;
+    if (t >= total) {
+      t = total;
+      show(scenes.length - 1);
+      paint();
+      play(false);
+    } else {
+      var n = idxAt(t);
+      if (n !== i) show(n);
+      paint();
+    }
+  }
+
+  function frame(now) {
+    if (!last) last = now;
+    var dt = Math.min(now - last, 120);   /* 切标签页回来别一次跳一大段 */
+    last = now;
+    advance(dt);
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- 缩放：1280x720 设计稿整体等比适配 ---------- */
+  function resize() {
+    var pad = window.innerWidth < 760 ? 0 : 34;
+    var k = Math.min((window.innerWidth - pad * 2) / 1280, (window.innerHeight - pad * 2) / 720);
+    if (window.innerWidth < 760) k = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    stage.style.transform = 'scale(' + Math.max(k, 0.1) + ')';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---------- 交互 ---------- */
+  document.getElementById('hud').addEventListener('click', function (e) { e.stopPropagation(); });
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (t >= total) { seek(0); play(true); return; }
+    play(!playing);
+  });
+
+  /* 点画面任意处：播放 / 暂停 */
+  viewport.addEventListener('click', function () {
+    if (t >= total) { seek(0); play(true); return; }
+    play(!playing);
+  });
+
+  /* 进度条：按下即定位，可拖动 */
+  var dragging = false;
+  function seekFromEvent(e) {
+    var r = bar.getBoundingClientRect();
+    var p = (e.clientX - r.left) / Math.max(1, r.width);
+    seek(p * total);
+  }
+  bar.addEventListener('pointerdown', function (e) {
+    e.stopPropagation(); e.preventDefault();
+    dragging = true; seekFromEvent(e);
+    try { bar.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  bar.addEventListener('pointermove', function (e) { if (dragging) seekFromEvent(e); });
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    bar.addEventListener(ev, function () { dragging = false; });
+  });
+
+  /* 键盘 */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      if (t >= total) { seek(0); play(true); } else play(!playing);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      seek(starts[Math.min(i + 1, scenes.length - 1)] + 30); play(false);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      seek(i > 0 && t - starts[i] < 600 ? starts[i - 1] + 30 : starts[i] + 30); play(false);
+    } else if (e.key === 'r' || e.key === 'R') {
+      seek(0); play(true);
+    }
+  });
+
+  /* 鼠标静止 3 秒收起 HUD，避免挡画面 */
+  var idleTimer = null;
+  function poke() {
+    document.getElementById('hud').classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      document.getElementById('hud').classList.add('idle');
+    }, 3200);
+  }
+  ['pointermove', 'pointerdown', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, poke, { passive: true });
+  });
+  poke();
+
+  /* ---------- 静帧 / 跳转模式（做海报截图用）
+       #still=3  跳到第 4 幕并直接呈现动画终态
+       #s=3      跳到第 4 幕暂停（不展开动画）
+       也可以 #still=3&t=400 在第 4 幕内再前进 0.4 秒            ---------- */
+  var hash = String(location.hash || '').replace(/^#/, '');
+  if (hash) {
+    var q = {};
+    hash.split('&').forEach(function (kv) {
+      var p = kv.split('=');
+      if (p[0]) q[p[0]] = p[1];
+    });
+    if (q.still != null || q.s != null) {
+      var n = Math.min(parseInt(q.still != null ? q.still : q.s, 10) || 0, scenes.length - 1);
+      var extra = parseInt(q.t, 10) || 0;
+      show(n);
+      t = starts[n] + extra;
+      paint();
+      if (q.still != null) document.documentElement.classList.add('is-still');
+      play(false);
+      requestAnimationFrame(frame);
+      return;
+    }
+  }
+
+  /* ---------- 自检探针 ----------
+     #probe=1 会把一串断言结果写进 <pre id="__PROMO_META__">，
+     用无头浏览器 --dump-dom 就能读到（和 _imgexport.js 一个套路）。 */
+  window.__PROMO__ = {
+    total: total, starts: starts, durs: durs,
+    names: scenes.map(function (s) { return s.dataset.name; }),
+    scene: function () { return i; },
+    time: function () { return t; },
+    playing: function () { return playing; },
+    seek: seek, show: show, play: play, advance: advance, idxAt: idxAt
+  };
+
+  function runProbe() {
+    var R = [];
+    function ok(name, cond, got) { R.push({ n: name, p: !!cond, g: got === undefined ? '' : String(got) }); }
+    function eq(name, a, b) { ok(name, String(a) === String(b), a + ' ≟ ' + b); }
+
+    /* 时间轴骨架 */
+    eq('幕数 = 9', scenes.length, 9);
+    eq('总时长 = 各幕之和', total, durs.reduce(function (a, b) { return a + b; }, 0));
+    eq('总时长 = 54 秒', Math.round(total / 100) / 10, 54);
+    ok('各幕起点严格递增', starts.every(function (v, k) { return k === 0 || v > starts[k - 1]; }));
+    eq('末幕起点 + 末幕时长 = 总长', starts[starts.length - 1] + durs[durs.length - 1], total);
+
+    /* 时间 → 哪一幕，四个边界各打一枪 */
+    var mapBad = [];
+    scenes.forEach(function (s, k) {
+      if (idxAt(starts[k] + Math.floor(durs[k] / 2)) !== k) mapBad.push(s.dataset.name);
+    });
+    ok('九幕各自的中点都落在本幕', mapBad.length === 0, mapBad.join(',') || '9/9 命中');
+    eq('0ms 落在第 1 幕', idxAt(0), 0);
+    eq('切幕前 1ms 仍停在上幕', idxAt(4800 - 1), 0);
+    eq('切幕那一刻进入下一幕', idxAt(4800), 1);
+    eq('总长前 1ms 落在末幕', idxAt(total - 1), scenes.length - 1);
+    eq('超出总长也夹在末幕', idxAt(total + 99999), scenes.length - 1);
+
+    /* seek 的夹取与互斥 */
+    seek(total + 5000);
+    eq('seek 越界后夹到末幕', i, scenes.length - 1);
+    ok('seek 后时钟不越界', t <= total, t);
+    seek(starts[3] + 10);
+    eq('seek 到第 4 幕', i, 3);
+    eq('同一时刻只有一幕亮着', scenes.filter(function (s) { return s.classList.contains('is-on'); }).length, 1);
+    eq('高亮的章节按钮只有一个', chipEls.filter(function (c) { return c.classList.contains('on'); }).length, 1);
+    eq('章节按钮数 = 幕数', chipEls.length, scenes.length);
+    eq('进度条刻度段数 = 幕数', dots.children.length, scenes.length);
+
+    /* 进度条与时钟跟着 seek 走 */
+    seek(Math.round(total / 2));
+    var w = parseFloat(fill.style.width);
+    ok('进度条走到约一半', Math.abs(w - 50) < 0.6, w.toFixed(2) + '%');
+    eq('时钟随 seek 更新', tc.textContent, '00:27 / 00:54');
+
+    /* 自动推进：直接喂 dt，验的是真实那段 advance 逻辑 */
+    seek(0); play(true);
+    advance(5000);
+    eq('喂 5 秒后时钟 = 5000ms', Math.round(t), 5000);
+    eq('喂 5 秒后自动翻到第 2 幕', i, 1);
+    advance(2000);
+    eq('再喂 2 秒仍在第 2 幕', i, 1);
+    ok('仍在第 2 幕时进度条已动', parseFloat(fill.style.width) > 10, fill.style.width);
+    advance(100000);
+    eq('喂过头自动停在末幕', i, scenes.length - 1);
+    eq('放完自动暂停', playing, false);
+    eq('超时后时钟夹在总长', t, total);
+
+    play(false); seek(0);
+
+    /* 内容与结构 —— 挡住「别提到 X」这类要求被改回归 */
+    var flowSec = document.querySelector('.scene.sflow');
+    ok('有「操作流程」一幕', !!flowSec);
+    eq('操作流程幕正好四步', flowSec ? flowSec.querySelectorAll('.fstep').length : 0, 4);
+    eq('操作流程幕每步都带图标', flowSec ? flowSec.querySelectorAll('.fstep .fs-ico > svg').length : 0, 4);
+    ok('导出幕强调「多种方式」', /多种方式/.test(document.querySelector('.s7').textContent));
+
+    var sceneText = [].slice.call(document.querySelectorAll('.scene'))
+      .map(function (s) { return s.textContent; }).join('');
+    ok('全片不提角色称呼', sceneText.indexOf('\u5E72\u4E8B') < 0);
+    ok('全片不提随手转交的说法', sceneText.indexOf('\u7529\u56DE') < 0);
+    ok('全片不提外部品牌名', sceneText.indexOf('\u82F9\u679C') < 0);
+
+    /* 动效真的挂上了 —— 查计算样式，不查源码里写了什么 */
+    var fi = scenes.indexOf(flowSec);
+    seek(starts[fi] + 120);
+    var steps = [].slice.call(flowSec.querySelectorAll('.fstep'));
+    var delays = steps.map(function (el) { return parseFloat(getComputedStyle(el).animationDelay) || 0; });
+    ok('四步入场依次错开', delays.length === 4 && delays[0] > 0 &&
+      delays.every(function (v, k) { return k === 0 || v > delays[k - 1]; }), delays.join('/'));
+    ok('四步停在动画终态', steps.every(function (el) {
+      return getComputedStyle(el).animationFillMode === 'both'; }));
+    ok('图标高亮动画已挂上', steps.every(function (el) {
+      return getComputedStyle(el.querySelector('.fs-ico')).animationName === 'fsRing'; }));
+    ok('进度轨填充动画已挂上',
+      getComputedStyle(flowSec.querySelector('.fl-fill')).animationName === 'flGrow');
+    ok('游标移动动画已挂上',
+      getComputedStyle(flowSec.querySelector('.fl-dot')).animationName === 'flMove');
+    var s4 = document.querySelector('.s4');
+    seek(starts[scenes.indexOf(s4)] + 120);
+    ok('矩形绘入动画已挂上',
+      getComputedStyle(s4.querySelector('.shot .rect')).animationName === 'rectDraw');
+
+    var s7 = document.querySelector('.s7');
+    seek(starts[scenes.indexOf(s7)] + 120);
+    ok('导出项滑入动画已挂上',
+      getComputedStyle(s7.querySelector('.exp-i')).animationName === 'slideIn');
+    ok('长图引线绘入动画已挂上',
+      getComputedStyle(s7.querySelector('.lm-line')).animationName === 'lmDraw');
+    ok('长图卡入场动画已挂上',
+      getComputedStyle(s7.querySelector('.lm-card')).animationName === 'pop');
+
+    var pre = document.createElement('pre');
+    pre.id = '__PROMO_META__';
+    pre.textContent = JSON.stringify(R);
+    document.body.appendChild(pre);
+  }
+
+  show(0);
+  paint();
+  play(true);
+
+  if (hash.indexOf('probe=1') >= 0) { runProbe(); return; }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

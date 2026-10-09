@@ -1754,7 +1754,8 @@
 
     var no = numMap && numMap[m.id];
     var a = anchorOf(m);
-    var r = S * 0.026;
+    /* 序号徽标半径。原来 0.026，在图上太占视野、压住正文，减半。 */
+    var r = S * 0.013;
 
     if (m.tool === 'pin' && !no) {
       g.appendChild(svgEl('circle', {
