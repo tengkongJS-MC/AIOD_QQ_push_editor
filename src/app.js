@@ -145,12 +145,19 @@
     t_pin: svgI('<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>', 1.9),
     t_undo: svgI('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>', 1.9),
     t_clear: svgI('<path d="M3.5 6h17"/><path d="M9 6V3.6h6V6"/><path d="m6 6 .9 14.4h10.2L18 6"/>', 1.9),
-    t_replace: svgI('<path d="M20.5 12a8.5 8.5 0 1 1-2.7-6.2"/><path d="M20.5 3.5V9h-5.5"/>', 1.9)
+    t_replace: svgI('<path d="M20.5 12a8.5 8.5 0 1 1-2.7-6.2"/><path d="M20.5 3.5V9h-5.5"/>', 1.9),
+
+    /* 平移 / 缩放。图标一律走这一张表，别在拼 HTML 的地方手写 path ——
+       手写那一次把撤销画成了缺口圆圈，自测还看不出来。 */
+    t_pan: svgI('<path d="M12 3.5v17M3.5 12h17"/><path d="M9.5 6 12 3.5 14.5 6"/><path d="M9.5 18l2.5 2.5L14.5 18"/><path d="M6 9.5 3.5 12 6 14.5"/><path d="M18 9.5 20.5 12 18 14.5"/>', 1.8),
+    t_zoom_in: svgI('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m20.5 20.5-4.4-4.4"/><path d="M10.8 8v5.6M8 10.8h5.6"/>', 1.9),
+    t_zoom_out: svgI('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m20.5 20.5-4.4-4.4"/><path d="M8 10.8h5.6"/>', 1.9)
   };
 
   var ICON_BY_TOOL = {
     select: ICONS.t_select, rect: ICONS.t_rect, ellipse: ICONS.t_ellipse,
-    arrow: ICONS.t_arrow, pen: ICONS.t_pen, highlight: ICONS.t_highlight, pin: ICONS.t_pin
+    arrow: ICONS.t_arrow, pen: ICONS.t_pen, highlight: ICONS.t_highlight,
+    pin: ICONS.t_pin, pan: ICONS.t_pan
   };
 
   /* 批注类型定义 */
@@ -1568,7 +1575,8 @@
     { key: 'arrow',     label: '箭头' },
     { key: 'pen',       label: '画笔' },
     { key: 'highlight', label: '高亮框' },
-    { key: 'pin',       label: '标点' }
+    { key: 'pin',       label: '标点' },
+    { key: 'pan',       label: '平移' }
   ];
   var IMG_TOOL_MAP = {};
   IMG_TOOLS.forEach(function (t) { IMG_TOOL_MAP[t.key] = t; });
@@ -1599,15 +1607,24 @@
     tool: 'rect',
     color: IMG_COLORS[0],
     width: 'mid',
-    zoom: 'fit',
+    /* 缩放：zoomFit=true 走「适应宽度」，否则用 scale（相对图片原始像素的倍率）。
+       两个字段而不是一个 'fit' 字符串，是因为捏合时需要一个真正的数字倍率。 */
+    zoomFit: true,
+    scale: 1,
     sel: null,        /* 当前选中的标注 id */
     dur: null,        /* 意见框正在编辑的标注 id */
     drawing: false,
     start: null,
     cur: null,
     pts: [],
+    panning: false,
+    panFrom: null,
+    pinching: false,
     lastType: 'general'
   };
+
+  /* 图片原始像素的 15% ~ 800%。下限再小就点不中锚点了，上限再大只会看到马赛克。 */
+  var ZOOM_MIN = 0.15, ZOOM_MAX = 8, ZOOM_STEP = 1.25;
 
   /* ---------- 取值 / 换算 ---------- */
   function imgSize(doc) {
@@ -1815,20 +1832,112 @@
     svg.setAttribute('data-tool', STATE.mode === 'preview' ? 'select' : DRAW.tool);
     svg.classList.toggle('is-locked', STATE.mode === 'preview');
 
-    fitHolder();
     renderImgTools();
+    applyView();
     paintMarks();
   }
 
-  function fitHolder() {
-    if (!STATE.doc || !STATE.doc.image) return;
-    var board = $('#imgBoard');
-    var n = imgSize();
-    var availW = Math.max(120, board.clientWidth - 32);
-    var scale = DRAW.zoom === 'fit' ? Math.min(1, availW / n.w) : DRAW.zoom;
-    $('#imgHolder').style.width = Math.round(n.w * scale) + 'px';
-    $('#imgHolder').style.height = Math.round(n.h * scale) + 'px';
+  /* ---------- 缩放 ----------
+     缩放只改图片在屏幕上的大小，不改数据：所有标注一律存归一化比例（0~1），
+     任何倍率下都落在同一个像素上，所以放大缩小不会让标注跑偏一分。
+
+     默认倍率按设备分（见 resetZoomDefault）：桌面按 1:1 原尺寸铺开、不做压缩；
+     窄屏先「适应宽度」把整张图看全 —— 手机屏宽才三百多像素，
+     一张 1080 宽的截图按原尺寸打开只能看见三分之一，反而没法用。 */
+  function boardPad() {
+    var b = $('#imgBoard');
+    if (!b) return { x: 36, y: 36 };
+    var cs = window.getComputedStyle(b);
+    return {
+      x: (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0),
+      y: (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+    };
   }
+  /* 「适应宽度」的倍率。封顶 1：放大只会糊，要放大请走缩放按钮。 */
+  function fitScale() {
+    var b = $('#imgBoard');
+    var n = imgSize();
+    if (!b || !n.w) return 1;
+    return Math.min(1, Math.max(80, b.clientWidth - boardPad().x) / n.w);
+  }
+  function viewScale() { return DRAW.zoomFit ? fitScale() : DRAW.scale; }
+
+  /* 画布上「能缩放、能画」的判定。手势派发、滚轮、自测共用一条。 */
+  function imgViewActive() {
+    var h = $('#imgHolder');
+    return !!(STATE.doc && STATE.doc.kind === 'image' && STATE.doc.image &&
+              h && !h.classList.contains('hidden') && STATE.mode !== 'edit');
+  }
+
+  /* 把倍率落到 DOM。宽高都取「原始像素 × 倍率」，所以画面宽高比恒等于原图——
+     这条是"缩放不改变比例"的实现保证，别改成分别设 width/height 的百分比。 */
+  function applyView() {
+    if (!STATE.doc || !STATE.doc.image) return;
+    var b = $('#imgBoard'), h = $('#imgHolder');
+    if (!b || !h) return;
+    var n = imgSize();
+    var s = viewScale();
+    var w = Math.max(1, Math.round(n.w * s));
+    var hh = Math.max(1, Math.round(n.h * s));
+    h.style.width = w + 'px';
+    h.style.height = hh + 'px';
+
+    /* 比画布小就居中，比画布大就贴左上。
+       贴左上这一步不能省：flex 居中时溢出部分会缩到负方向，滚动条够不着左上角。 */
+    var pad = boardPad();
+    var roomW = Math.max(0, b.clientWidth - pad.x);
+    var roomH = Math.max(0, b.clientHeight - pad.y);
+    h.style.marginLeft = Math.max(0, Math.round((roomW - w) / 2)) + 'px';
+    h.style.marginTop = Math.max(0, Math.round((roomH - hh) / 2)) + 'px';
+    b.classList.toggle('is-pannable', w > roomW + 1 || hh > roomH + 1);
+
+    syncZoomUI(s);
+  }
+
+  function zoomPct(s) { return Math.round(s * 1000) / 10 + '%'; }
+
+  function syncZoomUI(s) {
+    if (s == null) s = viewScale();
+    var pct = $('#imgZoomPct');
+    if (pct) pct.textContent = zoomPct(s);
+    var fit = $('#imgZoomFit');
+    if (fit) fit.classList.toggle('is-on', !!DRAW.zoomFit);
+  }
+
+  function clampScale(s) {
+    if (!isFinite(s) || s <= 0) return 1;
+    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, s));
+  }
+
+  /* 缩放时把「手指/光标底下那一点」钉在原地 ——
+     否则一放大画面就飞了，还得重新找刚才在看的地方。 */
+  function setScale(s, anchor) {
+    if (!STATE.doc || !STATE.doc.image) return;
+    var board = $('#imgBoard'), svg = $('#stageSvg');
+    var a = anchor, pt = null;
+    if (!a && board) {
+      var br = board.getBoundingClientRect();
+      a = { x: br.left + board.clientWidth / 2, y: br.top + board.clientHeight / 2 };
+    }
+    if (a && svg) {
+      var r = svg.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        pt = { x: (a.x - r.left) / r.width, y: (a.y - r.top) / r.height };
+      }
+    }
+    DRAW.zoomFit = false;
+    DRAW.scale = clampScale(s);
+    applyView();
+    if (pt && board && svg) {
+      var r2 = svg.getBoundingClientRect();
+      board.scrollLeft += (r2.left + pt.x * r2.width) - a.x;
+      board.scrollTop += (r2.top + pt.y * r2.height) - a.y;
+    }
+  }
+  function zoomBy(f, anchor) { setScale(viewScale() * f, anchor); }
+  function zoomToFit() { DRAW.zoomFit = true; applyView(); }
+  function zoomToActual() { setScale(1); }
+  function resetZoomDefault() { DRAW.zoomFit = isNarrow(); DRAW.scale = 1; }
 
   function paintMarks() {
     var svg = $('#stageSvg');
@@ -1871,10 +1980,6 @@
     });
     h += '</div>';
 
-    var zoomOpt = function (v, label) {
-      return '<option value="' + v + '"' +
-        (String(DRAW.zoom) === v ? ' selected' : '') + '>' + label + '</option>';
-    };
     h += '<div class="it-group">' +
       '<button type="button" class="it-btn" data-act="undo" title="撤销上一步 (Ctrl+Z)">' +
         ICONS.t_undo + '<span>撤销</span></button>' +
@@ -1882,13 +1987,22 @@
         ICONS.t_clear + '<span>清空</span></button>' +
       '<button type="button" class="it-btn" data-act="replace" title="换一张截图">' +
         ICONS.t_replace + '<span>换图</span></button>' +
-      '<select id="imgZoom" class="mini-select" title="缩放">' +
-        zoomOpt('fit', '适应宽度') + zoomOpt('0.5', '50%') +
-        zoomOpt('1', '100%') + zoomOpt('1.5', '150%') +
-      '</select>' +
+      '</div>';
+
+    /* 缩放条。手机上没有 Ctrl+滚轮、也没有 hover，全靠这两个键加「适应」加捏合。 */
+    h += '<div class="it-group it-zoom">' +
+      '<button type="button" class="it-btn ic" data-zoom="out" title="缩小">' +
+        ICONS.t_zoom_out + '</button>' +
+      '<button type="button" class="it-btn it-pct" id="imgZoomPct" data-zoom="actual" ' +
+        'title="回到 100%（原始尺寸）"></button>' +
+      '<button type="button" class="it-btn ic" data-zoom="in" title="放大">' +
+        ICONS.t_zoom_in + '</button>' +
+      '<button type="button" class="it-btn" id="imgZoomFit" data-zoom="fit" title="整张图适应窗口宽度">' +
+        '<span>适应</span></button>' +
       '</div>';
 
     box.innerHTML = h;
+    syncZoomUI();
   }
 
   function syncSvgTool() {
@@ -1896,9 +2010,19 @@
     if (svg) svg.setAttribute('data-tool', STATE.mode === 'preview' ? 'select' : DRAW.tool);
   }
 
+  function imgZoomAction(a, anchor) {
+    if (a === 'in') zoomBy(ZOOM_STEP, anchor);
+    else if (a === 'out') zoomBy(1 / ZOOM_STEP, anchor);
+    else if (a === 'fit') zoomToFit();
+    else if (a === 'actual') zoomToActual();
+  }
+
   function onImgToolClick(e) {
     var t = e.target && e.target.closest ? e.target.closest('[data-tool]') : null;
     if (t) { DRAW.tool = t.dataset.tool; renderImgTools(); syncSvgTool(); return; }
+
+    var z = e.target && e.target.closest ? e.target.closest('[data-zoom]') : null;
+    if (z) { imgZoomAction(z.dataset.zoom); return; }
 
     var c = e.target.closest ? e.target.closest('[data-color]') : null;
     if (c) { DRAW.color = c.dataset.color; renderImgTools(); return; }
@@ -1926,12 +2050,15 @@
   function onImgPointerDown(e) {
     if (!STATE.doc || STATE.doc.kind !== 'image') return;
     if (STATE.mode !== 'annotate') return;
+    if (DRAW.pinching) return;      /* 双指已经落下：这一指是给缩放的，别画 */
 
     /* 意见框开着时先把话说完，避免手一抖把没保存的意见弄丢 */
     if (DRAW.dur) {
       if (imgComposerDirty()) { toast('先把意见保存，或按 Esc 取消'); return; }
       hideImgComposer();
     }
+
+    if (DRAW.tool === 'pan') { startPan(e); return; }
 
     if (DRAW.tool === 'select') {
       var hit = e.target && e.target.closest ? e.target.closest('[data-mk]') : null;
@@ -1948,7 +2075,45 @@
     paintPreview();
   }
 
+  /* 平移：只动画布的滚动位置，不碰任何数据。
+     放大之后没有它就没法把切到画外的手指挪回画面。 */
+  function startPan(e) {
+    var board = $('#imgBoard');
+    if (!board) return;
+    e.preventDefault();
+    DRAW.panning = true;
+    DRAW.panFrom = { x: e.clientX, y: e.clientY, sl: board.scrollLeft, st: board.scrollTop };
+    $('#stageSvg').classList.add('is-panning');
+    try { $('#stageSvg').setPointerCapture(e.pointerId); } catch (err) {}
+  }
+  function movePan(e) {
+    if (!DRAW.panning || !DRAW.panFrom) return;
+    var board = $('#imgBoard');
+    e.preventDefault();
+    board.scrollLeft = DRAW.panFrom.sl - (e.clientX - DRAW.panFrom.x);
+    board.scrollTop = DRAW.panFrom.st - (e.clientY - DRAW.panFrom.y);
+  }
+  function endPan(e) {
+    if (!DRAW.panning) return;
+    DRAW.panning = false;
+    DRAW.panFrom = null;
+    $('#stageSvg').classList.remove('is-panning');
+    try { $('#stageSvg').releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+
+  /* 捏合开始时把「画到一半」的那笔扔掉。
+     半截线留在预览层不清，松手后会变成一条来历不明的线。 */
+  function cancelStroke() {
+    if (!DRAW.drawing) return;
+    DRAW.drawing = false;
+    DRAW.start = DRAW.cur = null;
+    DRAW.pts = [];
+    var g = $('#svPreview');
+    if (g) while (g.firstChild) g.removeChild(g.firstChild);
+  }
+
   function onImgPointerMove(e) {
+    if (DRAW.panning) { movePan(e); return; }
     if (!DRAW.drawing) return;
     var p = normFromEvent(e);
     DRAW.cur = p;
@@ -1962,6 +2127,7 @@
   }
 
   function onImgPointerUp(e) {
+    if (DRAW.panning) { endPan(e); return; }
     if (!DRAW.drawing) return;
     DRAW.drawing = false;
     try { $('#stageSvg').releasePointerCapture(e.pointerId); } catch (err) {}
@@ -2446,6 +2612,7 @@
       target.marks = target.marks || [];
       target.updatedAt = Date.now();
       STATE.mode = 'annotate';
+      resetZoomDefault();      /* 每张新图都回到该设备的默认倍率，不继承上一张的缩放 */
       hideImgComposer();
 
       var saved = store.setDoc(target);
@@ -3732,12 +3899,6 @@
     });
 
     $('#imgTools').addEventListener('click', onImgToolClick);
-    $('#imgTools').addEventListener('change', function (e) {
-      if (!e.target || e.target.id !== 'imgZoom') return;
-      var v = e.target.value;
-      DRAW.zoom = v === 'fit' ? 'fit' : parseFloat(v);
-      fitHolder();
-    });
     $('#imgTools').addEventListener('input', function (e) {
       if (!e.target || e.target.id !== 'imgColor') return;
       DRAW.color = e.target.value;
@@ -3770,6 +3931,67 @@
       if (f && /^image\//.test(f.type)) importImage(f);
     });
 
+    /* ---------- 缩放：捏合 / 双指平移 / Ctrl+滚轮 ----------
+       全部挂在 board 上、走捕获阶段：第二指一落下就先取消画到一半的那笔，
+       并把 pinching 立起来 —— 捕获阶段早于 SVG 上的绘制回调，
+       于是那一指送到绘制逻辑时已被拦下，不会在图上多画一道。 */
+    var touchPts = {}, pinch = null;
+
+    function twoFinger() {
+      var ids = Object.keys(touchPts);
+      if (ids.length < 2) return null;
+      var a = touchPts[ids[0]], b = touchPts[ids[1]];
+      var dx = a.x - b.x, dy = a.y - b.y;
+      return {
+        d: Math.max(1, Math.sqrt(dx * dx + dy * dy)),
+        cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2
+      };
+    }
+
+    board.addEventListener('pointerdown', function (e) {
+      if (!imgViewActive()) return;
+      touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(touchPts).length !== 2) return;
+      cancelStroke();
+      DRAW.panning = false; DRAW.panFrom = null;
+      $('#stageSvg').classList.remove('is-panning');
+      DRAW.pinching = true;
+      var t = twoFinger();
+      pinch = { d: t.d, s: viewScale(), cx: t.cx, cy: t.cy };
+    }, true);
+
+    /* 收尾必须挂 window：手指在画布外抬起时，board 根本收不到 pointerup，
+       残留的指针会让「双指还在」这个状态一直挂着，之后单指一划就乱缩放。 */
+    board.addEventListener('pointermove', function (e) {
+      if (!touchPts[e.pointerId]) return;
+      touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (!pinch) return;
+      var t = twoFinger();
+      if (!t) return;
+      e.preventDefault();
+      /* 中点位移当平移：一边放大，一边把两指夹住的那块地方拖回来 */
+      board.scrollLeft -= (t.cx - pinch.cx);
+      board.scrollTop -= (t.cy - pinch.cy);
+      pinch.cx = t.cx; pinch.cy = t.cy;
+      setScale(pinch.s * (t.d / pinch.d), { x: t.cx, y: t.cy });
+    }, { capture: true, passive: false });
+
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      window.addEventListener(ev, function (e) {
+        if (!touchPts[e.pointerId]) return;
+        delete touchPts[e.pointerId];
+        if (Object.keys(touchPts).length < 2) { pinch = null; DRAW.pinching = false; }
+      }, true);
+    });
+
+    /* 桌面：Ctrl / ⌘ + 滚轮按光标位置缩放，普通滚轮照旧滚动。
+       passive:false 不能省，否则 preventDefault 无效、页面会跟着一起缩放。 */
+    board.addEventListener('wheel', function (e) {
+      if (!imgViewActive() || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12, { x: e.clientX, y: e.clientY });
+    }, { passive: false });
+
     /* 截图后直接 Ctrl + V —— 这是最顺手的入口 */
     document.addEventListener('paste', function (e) {
       var f = imageFromClipboard(e.clipboardData);
@@ -3789,7 +4011,7 @@
     });
 
     window.addEventListener('resize', function () {
-      if (STATE.doc && STATE.doc.kind === 'image') fitHolder();
+      if (STATE.doc && STATE.doc.kind === 'image') applyView();
     });
 
     /* 点击空白收起浮动条 */
@@ -3891,6 +4113,7 @@
     STATE.mode = defaultModeFor(STATE.doc);
 
     bindEvents();
+    resetZoomDefault();
     renderAll();
     setDirty(false);
     setMView('main');
@@ -3994,6 +4217,17 @@
     ptsAttr: ptsAttr,
     renderImgStage: renderImgStage,
     renderImgTools: renderImgTools,
+    applyView: applyView,
+    fitScale: fitScale,
+    viewScale: viewScale,
+    setScale: setScale,
+    zoomBy: zoomBy,
+    zoomToFit: zoomToFit,
+    zoomToActual: zoomToActual,
+    imgZoomAction: imgZoomAction,
+    resetZoomDefault: resetZoomDefault,
+    syncZoomUI: syncZoomUI,
+    imgViewActive: imgViewActive,
     paintMarks: paintMarks,
     openImgComposer: openImgComposer,
     commitImgComposer: commitImgComposer,

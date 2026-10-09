@@ -226,8 +226,23 @@ const testCode = `
       'svg 数=' + (toolHTML.match(/<svg/g) || []).length);
     okeq('F6 工具栏不再用字符图标',
       /[☞▭◯✎▨◉↶]/.test(toolHTML) === false);
-    okeq('F7 七个工具各自带图标',
-      document.querySelectorAll('#imgTools [data-tool] svg').length === 7);
+    /* 工具会随功能增减，所以断言「按钮数 = 带图标的按钮数」，不写死数字——
+       加了「平移」那次，写死 7 的这条就无信息量地红了。 */
+    okeq('F7 每个工具按钮都带图标（' +
+      document.querySelectorAll('#imgTools [data-tool]').length + ' 个工具）',
+      (function () {
+        var btns = document.querySelectorAll('#imgTools [data-tool]');
+        return btns.length >= 8 &&
+          btns.length === document.querySelectorAll('#imgTools [data-tool] svg').length;
+      })());
+    /* 图标漏配时拼出来是字面量 "undefined"：不报错，只是难看得莫名其妙 */
+    okeq('F7b 工具条里没有 undefined（图标没漏配）',
+      document.getElementById('imgTools').textContent.indexOf('undefined') < 0);
+    okeq('F7c 工具条带缩放控件（缩小 / 读数 / 放大 / 适应）',
+      !!document.querySelector('#imgTools [data-zoom="out"]') &&
+      !!document.querySelector('#imgTools [data-zoom="in"]') &&
+      !!document.getElementById('imgZoomPct') &&
+      !!document.getElementById('imgZoomFit'));
     /* 曾经的撤销图标是一段写歪的圆弧，渲染出来是个缺口圆圈。
        只要路径首段还是标准的「折角箭头」起点，就说明没退回旧值。 */
     okeq('F8 撤销图标是回退箭头（不是缺口圆圈）',

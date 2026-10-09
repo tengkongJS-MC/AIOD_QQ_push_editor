@@ -154,6 +154,139 @@ const testCode = `
       document.getElementById('stageSvg').getAttribute('viewBox'),
       '0 0 ' + doc.image.w + ' ' + doc.image.h);
 
+    /* ---------- Z. 缩放 ----------
+       这一节要盯两件事：
+       一是「传入图被压缩」这个真 bug —— 它压根不在缩放逻辑里，
+         而是卡片作为纵向 flex 子项被 flex-shrink 压扁把图挤变形，
+         所以断言一律打在 getBoundingClientRect（渲染尺寸）上，只看 style.height 是瞎的。
+       二是缩放不能改写「屏幕坐标 → 归一化坐标」的换算，否则症状是标注整体跑偏。 */
+    var holder = document.getElementById('imgHolder');
+    var board = document.getElementById('imgBoard');
+    var imgW = doc.image.w, imgH = doc.image.h;
+
+    T('Z1 桌面默认 1:1 原尺寸打开（不压缩）', Q.DRAW.zoomFit, false);
+    T('Z2 默认倍率就是 100%', Q.viewScale(), 1);
+    var box0 = holder.getBoundingClientRect();
+    T('Z3 画布渲染尺寸等于图片原始像素',
+      [Math.round(box0.width), Math.round(box0.height)], [imgW, imgH]);
+    T('Z4 宽高比与原图一致',
+      Math.round(box0.width / box0.height * 100), Math.round(imgW / imgH * 100));
+
+    /* 复现用户报的那张图：长图（远高于画布）打开时的比例失真 */
+    var keepImgH = Q.STATE.doc.image.h;
+    Q.STATE.doc.image.h = keepImgH * 4;
+    Q.applyView();
+    var tallBox = holder.getBoundingClientRect();
+    T('Z5 长图不被压扁：渲染高度跟得上设定高度',
+      Math.round(tallBox.height), Math.round(keepImgH * 4 * Q.viewScale()));
+    near('Z6 长图渲染后的宽高比仍是原比例',
+      tallBox.width / tallBox.height, Q.STATE.doc.image.w / Q.STATE.doc.image.h, 0.02);
+    T('Z7 长图高过画布时画布可纵向滚动',
+      board.scrollHeight > board.clientHeight, true);
+    Q.STATE.doc.image.h = keepImgH;
+    Q.applyView();
+
+    /* 「适应」只缩不放：小图不会被拉大发虚 */
+    T('Z8 适应倍率封顶 100%', Q.fitScale() <= 1, true);
+    var keepImgW = Q.STATE.doc.image.w;
+    Q.STATE.doc.image.w = 6000;          /* 假装来了一张远宽于画布的图 */
+    var wideFit = Q.fitScale();
+    Q.STATE.doc.image.w = keepImgW;
+    T('Z9 超宽图的适应倍率小于 100%', wideFit > 0 && wideFit < 1, true);
+
+    /* 倍率上下限：再乱按也不会缩到看不见、也不会放大到只剩马赛克 */
+    Q.setScale(0.01);
+    T('Z10 缩小有下限', Q.viewScale(), 0.15);
+    Q.setScale(99);
+    T('Z11 放大到上限被夹住', Q.viewScale(), 8);
+    Q.setScale(2);
+    T('Z12 放大后画布按倍率变大',
+      Math.round(holder.getBoundingClientRect().width), Math.round(imgW * 2));
+    var z12 = holder.getBoundingClientRect();
+    T('Z13 放大后仍保持原比例',
+      Math.round(z12.width / z12.height * 100), Math.round(imgW / imgH * 100));
+
+    /* 关键回归：缩放只改显示，不改坐标换算。
+       哪天有人图省事拿 clientX 直接除以图片原始宽度，这里立刻红。 */
+    var marksBefore = Q.STATE.doc.marks.length;
+    Q.DRAW.tool = 'rect';
+    dragNorm(0.25, 0.30, 0.60, 0.55);
+    var zoomMark = Q.STATE.doc.marks[Q.STATE.doc.marks.length - 1];
+    T('Z14 2 倍缩放下照样能画', Q.STATE.doc.marks.length, marksBefore + 1);
+    near('Z15 2 倍缩放下 x0 换算依然准确', zoomMark.geo.x0, 0.25, 0.02);
+    near('Z16 2 倍缩放下 y1 换算依然准确', zoomMark.geo.y1, 0.55, 0.02);
+    Q.undoMark();
+
+    /* 平移：只挪画面，不落笔。放大后没有它就没法把切到画外的手指挪回来 */
+    Q.setScale(3);
+    board.scrollLeft = 0; board.scrollTop = 0;
+    Q.DRAW.tool = 'pan';
+    var nBeforePan = Q.STATE.doc.marks.length;
+    dragNorm(0.70, 0.70, 0.25, 0.25, 4);
+    T('Z17 平移工具不产生标注', Q.STATE.doc.marks.length, nBeforePan);
+    T('Z18 平移真的把画面挪动了', board.scrollTop > 0 && board.scrollLeft > 0, true);
+    T('Z19 图比画布大时贴左上（溢出可滚到）', parseFloat(holder.style.marginLeft), 0);
+    T('Z20 溢出时不再插入空白居中', parseFloat(holder.style.marginTop), 0);
+
+    /* 工具栏读数 + 按钮 */
+    T('Z21 工具条里有平移工具',
+      !!document.querySelector('#imgTools [data-tool="pan"]'), true);
+    /* 图标从 ICONS 取不到时会拼成字面量 "undefined"（不报错，只是难看），
+       实证抓一次：工具条里出现 undefined 就是漏配了图标。 */
+    T('Z22 工具条里没有 undefined（图标没漏配）',
+      document.getElementById('imgTools').textContent.indexOf('undefined'), -1);
+    T('Z23 每个工具按钮都带图标',
+      Array.prototype.every.call(document.querySelectorAll('#imgTools [data-tool]'), function (b) {
+        return !!b.querySelector('svg');
+      }), true);
+    T('Z24 工具有缩放读数', !!document.getElementById('imgZoomPct'), true);
+    T('Z25 工具条里有「适应」按钮', !!document.getElementById('imgZoomFit'), true);
+    Q.setScale(2.5);
+    T('Z26 读数跟随倍率', document.getElementById('imgZoomPct').textContent, '250%');
+    Q.zoomToFit();
+    T('Z27「适应」按钮在适应态高亮',
+      document.getElementById('imgZoomFit').classList.contains('is-on'), true);
+    T('Z28「适应」把整图收进画布宽度',
+      holder.getBoundingClientRect().width <= board.clientWidth, true);
+    Q.zoomToActual();
+    T('Z29 100% 按钮回到原尺寸', Q.viewScale(), 1);
+    T('Z30 回到 100% 后按钮不再高亮',
+      document.getElementById('imgZoomFit').classList.contains('is-on'), false);
+
+    /* 捏合：手机上最顺手的放大方式，必须真的能改倍率。
+       注意 pointerup 要派发到 window —— 手指在画布外抬起时 board 收不到。 */
+    function pinchEv(id, x, y, type) {
+      return new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: id, pointerType: 'touch',
+        isPrimary: id === 1, clientX: x, clientY: y
+      });
+    }
+    Q.setScale(1);
+    var br = board.getBoundingClientRect();
+    var px = br.left + 140, py = br.top + 160;
+    board.dispatchEvent(pinchEv(1, px - 40, py, 'pointerdown'));
+    board.dispatchEvent(pinchEv(2, px + 40, py, 'pointerdown'));
+    var s0 = Q.viewScale();
+    board.dispatchEvent(pinchEv(1, px - 80, py, 'pointermove'));
+    board.dispatchEvent(pinchEv(2, px + 80, py, 'pointermove'));
+    T('Z32 双指拉开就放大', Q.viewScale() > s0, true);
+    board.dispatchEvent(pinchEv(1, px - 160, py, 'pointermove'));
+    board.dispatchEvent(pinchEv(2, px + 160, py, 'pointermove'));
+    T('Z33 拉开越多放得越大', Q.viewScale() > s0 * 2, true);
+    window.dispatchEvent(pinchEv(2, px + 160, py, 'pointerup'));
+    var sAfter = Q.viewScale();
+    window.dispatchEvent(pinchEv(1, px - 400, py, 'pointermove'));
+    T('Z34 收掉一指后捏合立刻结束（不会单指乱缩放）', Q.viewScale(), sAfter);
+    window.dispatchEvent(pinchEv(1, px - 400, py, 'pointerup'));
+    T('Z35 捏合收尾后状态复位', Q.DRAW.pinching, false);
+
+    /* 收尾：回到默认倍率，后面的绘制用例从干净状态起步 */
+    Q.resetZoomDefault();
+    Q.applyView();
+    board.scrollLeft = 0; board.scrollTop = 0;
+    T('Z31 收起缩放后回到该设备的默认倍率', Q.viewScale(), 1);
+    Q.DRAW.tool = 'rect';
+
     /* ---------- C. 屏幕坐标 → 归一化坐标（最关键的一条） ---------- */
     Q.DRAW.tool = 'rect';
     Q.DRAW.color = '#E23B3B';

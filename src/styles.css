@@ -684,19 +684,41 @@ textarea.dlg-finput{min-height:74px;}
 }
 .it-color:hover{background:var(--fill-tertiary);}
 
-.img-board{flex:1;overflow:auto;position:relative;display:flex;flex-direction:column;padding:18px;min-height:0;}
+/* 成对出现的工具图标键：只有图标没有文字，左右收一收 */
+.it-btn.ic{padding:6px 8px;}
+.it-btn.ic svg{width:17px;height:17px;}
+/* 当前倍率。等宽数字，免得 100% → 99.9% 时按钮自己抖一下 */
+.it-pct{
+  min-width:54px;justify-content:center;padding:6px 6px;
+  font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--label-tertiary);
+}
+.it-pct:hover{color:var(--label-primary);}
+.it-zoom{gap:2px;}
+
+.img-board{flex:1;overflow:auto;position:relative;display:flex;flex-direction:column;padding:18px;min-height:0;-webkit-overflow-scrolling:touch;}
 .img-holder{
-  margin:auto;position:relative;line-height:0;background:var(--bg-elevated);
+  /* flex:none 这一条是整个「比例失真」问题的解药，别删：
+     这块卡片是 .img-board（纵向 flex）的子项，默认 flex-shrink:1。
+     图比画布高的时候，flex 会把卡片的高度压到画布高度，
+     而图片是 width/height:100% 撑满卡片的 —— 于是整张图被纵向压扁，
+     宽高比当场失真（1600 高的图能被压成 687，比例从 0.38 变成 0.87）。
+     这就是「传入图会压缩图片比例」的真正原因：不是缩放算法，是布局。
+     居中改由 applyView 用 marginLeft/Top 算 —— 图比画布大时要能贴左上，
+     让溢出的那一截滚得到；margin:auto 在溢出时会把左上角缩进负方向。 */
+  flex:none;margin:0;position:relative;line-height:0;background:var(--bg-elevated);
   border-radius:var(--r-sm);box-shadow:var(--shadow-md);overflow:hidden;
 }
 .img-holder img{display:block;width:100%;height:100%;-webkit-user-drag:none;user-select:none;}
 .img-holder svg{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;}
 .img-holder svg[data-tool="select"]{cursor:default;}
 .img-holder svg[data-tool]:not([data-tool="select"]){cursor:crosshair;}
+.img-holder svg[data-tool="pan"]{cursor:grab;}
+.img-holder svg.is-panning{cursor:grabbing;}
 .img-holder svg.is-locked{pointer-events:none;}
 
 .img-drop{
-  margin:auto;width:100%;max-width:440px;text-align:center;color:var(--label-tertiary);
+  /* 同上：纵向 flex 的子项，不加 flex:none 时内容一高就被压扁 */
+  flex:none;margin:auto;width:100%;max-width:440px;text-align:center;color:var(--label-tertiary);
   border-radius:var(--r-xl);background:var(--bg-elevated);padding:44px 28px;
   box-shadow:var(--shadow-sm);
   transition:box-shadow var(--dur-base) var(--ease-standard),background-color var(--dur-base) var(--ease-standard);

@@ -712,19 +712,41 @@ textarea.dlg-finput{min-height:74px;}
 }
 .it-color:hover{background:var(--fill-tertiary);}
 
-.img-board{flex:1;overflow:auto;position:relative;display:flex;flex-direction:column;padding:18px;min-height:0;}
+/* 成对出现的工具图标键：只有图标没有文字，左右收一收 */
+.it-btn.ic{padding:6px 8px;}
+.it-btn.ic svg{width:17px;height:17px;}
+/* 当前倍率。等宽数字，免得 100% → 99.9% 时按钮自己抖一下 */
+.it-pct{
+  min-width:54px;justify-content:center;padding:6px 6px;
+  font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--label-tertiary);
+}
+.it-pct:hover{color:var(--label-primary);}
+.it-zoom{gap:2px;}
+
+.img-board{flex:1;overflow:auto;position:relative;display:flex;flex-direction:column;padding:18px;min-height:0;-webkit-overflow-scrolling:touch;}
 .img-holder{
-  margin:auto;position:relative;line-height:0;background:var(--bg-elevated);
+  /* flex:none 这一条是整个「比例失真」问题的解药，别删：
+     这块卡片是 .img-board（纵向 flex）的子项，默认 flex-shrink:1。
+     图比画布高的时候，flex 会把卡片的高度压到画布高度，
+     而图片是 width/height:100% 撑满卡片的 —— 于是整张图被纵向压扁，
+     宽高比当场失真（1600 高的图能被压成 687，比例从 0.38 变成 0.87）。
+     这就是「传入图会压缩图片比例」的真正原因：不是缩放算法，是布局。
+     居中改由 applyView 用 marginLeft/Top 算 —— 图比画布大时要能贴左上，
+     让溢出的那一截滚得到；margin:auto 在溢出时会把左上角缩进负方向。 */
+  flex:none;margin:0;position:relative;line-height:0;background:var(--bg-elevated);
   border-radius:var(--r-sm);box-shadow:var(--shadow-md);overflow:hidden;
 }
 .img-holder img{display:block;width:100%;height:100%;-webkit-user-drag:none;user-select:none;}
 .img-holder svg{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;}
 .img-holder svg[data-tool="select"]{cursor:default;}
 .img-holder svg[data-tool]:not([data-tool="select"]){cursor:crosshair;}
+.img-holder svg[data-tool="pan"]{cursor:grab;}
+.img-holder svg.is-panning{cursor:grabbing;}
 .img-holder svg.is-locked{pointer-events:none;}
 
 .img-drop{
-  margin:auto;width:100%;max-width:440px;text-align:center;color:var(--label-tertiary);
+  /* 同上：纵向 flex 的子项，不加 flex:none 时内容一高就被压扁 */
+  flex:none;margin:auto;width:100%;max-width:440px;text-align:center;color:var(--label-tertiary);
   border-radius:var(--r-xl);background:var(--bg-elevated);padding:44px 28px;
   box-shadow:var(--shadow-sm);
   transition:box-shadow var(--dur-base) var(--ease-standard),background-color var(--dur-base) var(--ease-standard);
@@ -1159,12 +1181,19 @@ textarea.dlg-finput{min-height:74px;}
     t_pin: svgI('<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>', 1.9),
     t_undo: svgI('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>', 1.9),
     t_clear: svgI('<path d="M3.5 6h17"/><path d="M9 6V3.6h6V6"/><path d="m6 6 .9 14.4h10.2L18 6"/>', 1.9),
-    t_replace: svgI('<path d="M20.5 12a8.5 8.5 0 1 1-2.7-6.2"/><path d="M20.5 3.5V9h-5.5"/>', 1.9)
+    t_replace: svgI('<path d="M20.5 12a8.5 8.5 0 1 1-2.7-6.2"/><path d="M20.5 3.5V9h-5.5"/>', 1.9),
+
+    /* 平移 / 缩放。图标一律走这一张表，别在拼 HTML 的地方手写 path ——
+       手写那一次把撤销画成了缺口圆圈，自测还看不出来。 */
+    t_pan: svgI('<path d="M12 3.5v17M3.5 12h17"/><path d="M9.5 6 12 3.5 14.5 6"/><path d="M9.5 18l2.5 2.5L14.5 18"/><path d="M6 9.5 3.5 12 6 14.5"/><path d="M18 9.5 20.5 12 18 14.5"/>', 1.8),
+    t_zoom_in: svgI('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m20.5 20.5-4.4-4.4"/><path d="M10.8 8v5.6M8 10.8h5.6"/>', 1.9),
+    t_zoom_out: svgI('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m20.5 20.5-4.4-4.4"/><path d="M8 10.8h5.6"/>', 1.9)
   };
 
   var ICON_BY_TOOL = {
     select: ICONS.t_select, rect: ICONS.t_rect, ellipse: ICONS.t_ellipse,
-    arrow: ICONS.t_arrow, pen: ICONS.t_pen, highlight: ICONS.t_highlight, pin: ICONS.t_pin
+    arrow: ICONS.t_arrow, pen: ICONS.t_pen, highlight: ICONS.t_highlight,
+    pin: ICONS.t_pin, pan: ICONS.t_pan
   };
 
   /* 批注类型定义 */
@@ -2582,7 +2611,8 @@ textarea.dlg-finput{min-height:74px;}
     { key: 'arrow',     label: '箭头' },
     { key: 'pen',       label: '画笔' },
     { key: 'highlight', label: '高亮框' },
-    { key: 'pin',       label: '标点' }
+    { key: 'pin',       label: '标点' },
+    { key: 'pan',       label: '平移' }
   ];
   var IMG_TOOL_MAP = {};
   IMG_TOOLS.forEach(function (t) { IMG_TOOL_MAP[t.key] = t; });
@@ -2613,15 +2643,24 @@ textarea.dlg-finput{min-height:74px;}
     tool: 'rect',
     color: IMG_COLORS[0],
     width: 'mid',
-    zoom: 'fit',
+    /* 缩放：zoomFit=true 走「适应宽度」，否则用 scale（相对图片原始像素的倍率）。
+       两个字段而不是一个 'fit' 字符串，是因为捏合时需要一个真正的数字倍率。 */
+    zoomFit: true,
+    scale: 1,
     sel: null,        /* 当前选中的标注 id */
     dur: null,        /* 意见框正在编辑的标注 id */
     drawing: false,
     start: null,
     cur: null,
     pts: [],
+    panning: false,
+    panFrom: null,
+    pinching: false,
     lastType: 'general'
   };
+
+  /* 图片原始像素的 15% ~ 800%。下限再小就点不中锚点了，上限再大只会看到马赛克。 */
+  var ZOOM_MIN = 0.15, ZOOM_MAX = 8, ZOOM_STEP = 1.25;
 
   /* ---------- 取值 / 换算 ---------- */
   function imgSize(doc) {
@@ -2829,20 +2868,112 @@ textarea.dlg-finput{min-height:74px;}
     svg.setAttribute('data-tool', STATE.mode === 'preview' ? 'select' : DRAW.tool);
     svg.classList.toggle('is-locked', STATE.mode === 'preview');
 
-    fitHolder();
     renderImgTools();
+    applyView();
     paintMarks();
   }
 
-  function fitHolder() {
-    if (!STATE.doc || !STATE.doc.image) return;
-    var board = $('#imgBoard');
-    var n = imgSize();
-    var availW = Math.max(120, board.clientWidth - 32);
-    var scale = DRAW.zoom === 'fit' ? Math.min(1, availW / n.w) : DRAW.zoom;
-    $('#imgHolder').style.width = Math.round(n.w * scale) + 'px';
-    $('#imgHolder').style.height = Math.round(n.h * scale) + 'px';
+  /* ---------- 缩放 ----------
+     缩放只改图片在屏幕上的大小，不改数据：所有标注一律存归一化比例（0~1），
+     任何倍率下都落在同一个像素上，所以放大缩小不会让标注跑偏一分。
+
+     默认倍率按设备分（见 resetZoomDefault）：桌面按 1:1 原尺寸铺开、不做压缩；
+     窄屏先「适应宽度」把整张图看全 —— 手机屏宽才三百多像素，
+     一张 1080 宽的截图按原尺寸打开只能看见三分之一，反而没法用。 */
+  function boardPad() {
+    var b = $('#imgBoard');
+    if (!b) return { x: 36, y: 36 };
+    var cs = window.getComputedStyle(b);
+    return {
+      x: (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0),
+      y: (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+    };
   }
+  /* 「适应宽度」的倍率。封顶 1：放大只会糊，要放大请走缩放按钮。 */
+  function fitScale() {
+    var b = $('#imgBoard');
+    var n = imgSize();
+    if (!b || !n.w) return 1;
+    return Math.min(1, Math.max(80, b.clientWidth - boardPad().x) / n.w);
+  }
+  function viewScale() { return DRAW.zoomFit ? fitScale() : DRAW.scale; }
+
+  /* 画布上「能缩放、能画」的判定。手势派发、滚轮、自测共用一条。 */
+  function imgViewActive() {
+    var h = $('#imgHolder');
+    return !!(STATE.doc && STATE.doc.kind === 'image' && STATE.doc.image &&
+              h && !h.classList.contains('hidden') && STATE.mode !== 'edit');
+  }
+
+  /* 把倍率落到 DOM。宽高都取「原始像素 × 倍率」，所以画面宽高比恒等于原图——
+     这条是"缩放不改变比例"的实现保证，别改成分别设 width/height 的百分比。 */
+  function applyView() {
+    if (!STATE.doc || !STATE.doc.image) return;
+    var b = $('#imgBoard'), h = $('#imgHolder');
+    if (!b || !h) return;
+    var n = imgSize();
+    var s = viewScale();
+    var w = Math.max(1, Math.round(n.w * s));
+    var hh = Math.max(1, Math.round(n.h * s));
+    h.style.width = w + 'px';
+    h.style.height = hh + 'px';
+
+    /* 比画布小就居中，比画布大就贴左上。
+       贴左上这一步不能省：flex 居中时溢出部分会缩到负方向，滚动条够不着左上角。 */
+    var pad = boardPad();
+    var roomW = Math.max(0, b.clientWidth - pad.x);
+    var roomH = Math.max(0, b.clientHeight - pad.y);
+    h.style.marginLeft = Math.max(0, Math.round((roomW - w) / 2)) + 'px';
+    h.style.marginTop = Math.max(0, Math.round((roomH - hh) / 2)) + 'px';
+    b.classList.toggle('is-pannable', w > roomW + 1 || hh > roomH + 1);
+
+    syncZoomUI(s);
+  }
+
+  function zoomPct(s) { return Math.round(s * 1000) / 10 + '%'; }
+
+  function syncZoomUI(s) {
+    if (s == null) s = viewScale();
+    var pct = $('#imgZoomPct');
+    if (pct) pct.textContent = zoomPct(s);
+    var fit = $('#imgZoomFit');
+    if (fit) fit.classList.toggle('is-on', !!DRAW.zoomFit);
+  }
+
+  function clampScale(s) {
+    if (!isFinite(s) || s <= 0) return 1;
+    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, s));
+  }
+
+  /* 缩放时把「手指/光标底下那一点」钉在原地 ——
+     否则一放大画面就飞了，还得重新找刚才在看的地方。 */
+  function setScale(s, anchor) {
+    if (!STATE.doc || !STATE.doc.image) return;
+    var board = $('#imgBoard'), svg = $('#stageSvg');
+    var a = anchor, pt = null;
+    if (!a && board) {
+      var br = board.getBoundingClientRect();
+      a = { x: br.left + board.clientWidth / 2, y: br.top + board.clientHeight / 2 };
+    }
+    if (a && svg) {
+      var r = svg.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        pt = { x: (a.x - r.left) / r.width, y: (a.y - r.top) / r.height };
+      }
+    }
+    DRAW.zoomFit = false;
+    DRAW.scale = clampScale(s);
+    applyView();
+    if (pt && board && svg) {
+      var r2 = svg.getBoundingClientRect();
+      board.scrollLeft += (r2.left + pt.x * r2.width) - a.x;
+      board.scrollTop += (r2.top + pt.y * r2.height) - a.y;
+    }
+  }
+  function zoomBy(f, anchor) { setScale(viewScale() * f, anchor); }
+  function zoomToFit() { DRAW.zoomFit = true; applyView(); }
+  function zoomToActual() { setScale(1); }
+  function resetZoomDefault() { DRAW.zoomFit = isNarrow(); DRAW.scale = 1; }
 
   function paintMarks() {
     var svg = $('#stageSvg');
@@ -2885,10 +3016,6 @@ textarea.dlg-finput{min-height:74px;}
     });
     h += '</div>';
 
-    var zoomOpt = function (v, label) {
-      return '<option value="' + v + '"' +
-        (String(DRAW.zoom) === v ? ' selected' : '') + '>' + label + '</option>';
-    };
     h += '<div class="it-group">' +
       '<button type="button" class="it-btn" data-act="undo" title="撤销上一步 (Ctrl+Z)">' +
         ICONS.t_undo + '<span>撤销</span></button>' +
@@ -2896,13 +3023,22 @@ textarea.dlg-finput{min-height:74px;}
         ICONS.t_clear + '<span>清空</span></button>' +
       '<button type="button" class="it-btn" data-act="replace" title="换一张截图">' +
         ICONS.t_replace + '<span>换图</span></button>' +
-      '<select id="imgZoom" class="mini-select" title="缩放">' +
-        zoomOpt('fit', '适应宽度') + zoomOpt('0.5', '50%') +
-        zoomOpt('1', '100%') + zoomOpt('1.5', '150%') +
-      '</select>' +
+      '</div>';
+
+    /* 缩放条。手机上没有 Ctrl+滚轮、也没有 hover，全靠这两个键加「适应」加捏合。 */
+    h += '<div class="it-group it-zoom">' +
+      '<button type="button" class="it-btn ic" data-zoom="out" title="缩小">' +
+        ICONS.t_zoom_out + '</button>' +
+      '<button type="button" class="it-btn it-pct" id="imgZoomPct" data-zoom="actual" ' +
+        'title="回到 100%（原始尺寸）"></button>' +
+      '<button type="button" class="it-btn ic" data-zoom="in" title="放大">' +
+        ICONS.t_zoom_in + '</button>' +
+      '<button type="button" class="it-btn" id="imgZoomFit" data-zoom="fit" title="整张图适应窗口宽度">' +
+        '<span>适应</span></button>' +
       '</div>';
 
     box.innerHTML = h;
+    syncZoomUI();
   }
 
   function syncSvgTool() {
@@ -2910,9 +3046,19 @@ textarea.dlg-finput{min-height:74px;}
     if (svg) svg.setAttribute('data-tool', STATE.mode === 'preview' ? 'select' : DRAW.tool);
   }
 
+  function imgZoomAction(a, anchor) {
+    if (a === 'in') zoomBy(ZOOM_STEP, anchor);
+    else if (a === 'out') zoomBy(1 / ZOOM_STEP, anchor);
+    else if (a === 'fit') zoomToFit();
+    else if (a === 'actual') zoomToActual();
+  }
+
   function onImgToolClick(e) {
     var t = e.target && e.target.closest ? e.target.closest('[data-tool]') : null;
     if (t) { DRAW.tool = t.dataset.tool; renderImgTools(); syncSvgTool(); return; }
+
+    var z = e.target && e.target.closest ? e.target.closest('[data-zoom]') : null;
+    if (z) { imgZoomAction(z.dataset.zoom); return; }
 
     var c = e.target.closest ? e.target.closest('[data-color]') : null;
     if (c) { DRAW.color = c.dataset.color; renderImgTools(); return; }
@@ -2940,12 +3086,15 @@ textarea.dlg-finput{min-height:74px;}
   function onImgPointerDown(e) {
     if (!STATE.doc || STATE.doc.kind !== 'image') return;
     if (STATE.mode !== 'annotate') return;
+    if (DRAW.pinching) return;      /* 双指已经落下：这一指是给缩放的，别画 */
 
     /* 意见框开着时先把话说完，避免手一抖把没保存的意见弄丢 */
     if (DRAW.dur) {
       if (imgComposerDirty()) { toast('先把意见保存，或按 Esc 取消'); return; }
       hideImgComposer();
     }
+
+    if (DRAW.tool === 'pan') { startPan(e); return; }
 
     if (DRAW.tool === 'select') {
       var hit = e.target && e.target.closest ? e.target.closest('[data-mk]') : null;
@@ -2962,7 +3111,45 @@ textarea.dlg-finput{min-height:74px;}
     paintPreview();
   }
 
+  /* 平移：只动画布的滚动位置，不碰任何数据。
+     放大之后没有它就没法把切到画外的手指挪回画面。 */
+  function startPan(e) {
+    var board = $('#imgBoard');
+    if (!board) return;
+    e.preventDefault();
+    DRAW.panning = true;
+    DRAW.panFrom = { x: e.clientX, y: e.clientY, sl: board.scrollLeft, st: board.scrollTop };
+    $('#stageSvg').classList.add('is-panning');
+    try { $('#stageSvg').setPointerCapture(e.pointerId); } catch (err) {}
+  }
+  function movePan(e) {
+    if (!DRAW.panning || !DRAW.panFrom) return;
+    var board = $('#imgBoard');
+    e.preventDefault();
+    board.scrollLeft = DRAW.panFrom.sl - (e.clientX - DRAW.panFrom.x);
+    board.scrollTop = DRAW.panFrom.st - (e.clientY - DRAW.panFrom.y);
+  }
+  function endPan(e) {
+    if (!DRAW.panning) return;
+    DRAW.panning = false;
+    DRAW.panFrom = null;
+    $('#stageSvg').classList.remove('is-panning');
+    try { $('#stageSvg').releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+
+  /* 捏合开始时把「画到一半」的那笔扔掉。
+     半截线留在预览层不清，松手后会变成一条来历不明的线。 */
+  function cancelStroke() {
+    if (!DRAW.drawing) return;
+    DRAW.drawing = false;
+    DRAW.start = DRAW.cur = null;
+    DRAW.pts = [];
+    var g = $('#svPreview');
+    if (g) while (g.firstChild) g.removeChild(g.firstChild);
+  }
+
   function onImgPointerMove(e) {
+    if (DRAW.panning) { movePan(e); return; }
     if (!DRAW.drawing) return;
     var p = normFromEvent(e);
     DRAW.cur = p;
@@ -2976,6 +3163,7 @@ textarea.dlg-finput{min-height:74px;}
   }
 
   function onImgPointerUp(e) {
+    if (DRAW.panning) { endPan(e); return; }
     if (!DRAW.drawing) return;
     DRAW.drawing = false;
     try { $('#stageSvg').releasePointerCapture(e.pointerId); } catch (err) {}
@@ -3460,6 +3648,7 @@ textarea.dlg-finput{min-height:74px;}
       target.marks = target.marks || [];
       target.updatedAt = Date.now();
       STATE.mode = 'annotate';
+      resetZoomDefault();      /* 每张新图都回到该设备的默认倍率，不继承上一张的缩放 */
       hideImgComposer();
 
       var saved = store.setDoc(target);
@@ -4746,12 +4935,6 @@ textarea.dlg-finput{min-height:74px;}
     });
 
     $('#imgTools').addEventListener('click', onImgToolClick);
-    $('#imgTools').addEventListener('change', function (e) {
-      if (!e.target || e.target.id !== 'imgZoom') return;
-      var v = e.target.value;
-      DRAW.zoom = v === 'fit' ? 'fit' : parseFloat(v);
-      fitHolder();
-    });
     $('#imgTools').addEventListener('input', function (e) {
       if (!e.target || e.target.id !== 'imgColor') return;
       DRAW.color = e.target.value;
@@ -4784,6 +4967,67 @@ textarea.dlg-finput{min-height:74px;}
       if (f && /^image\//.test(f.type)) importImage(f);
     });
 
+    /* ---------- 缩放：捏合 / 双指平移 / Ctrl+滚轮 ----------
+       全部挂在 board 上、走捕获阶段：第二指一落下就先取消画到一半的那笔，
+       并把 pinching 立起来 —— 捕获阶段早于 SVG 上的绘制回调，
+       于是那一指送到绘制逻辑时已被拦下，不会在图上多画一道。 */
+    var touchPts = {}, pinch = null;
+
+    function twoFinger() {
+      var ids = Object.keys(touchPts);
+      if (ids.length < 2) return null;
+      var a = touchPts[ids[0]], b = touchPts[ids[1]];
+      var dx = a.x - b.x, dy = a.y - b.y;
+      return {
+        d: Math.max(1, Math.sqrt(dx * dx + dy * dy)),
+        cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2
+      };
+    }
+
+    board.addEventListener('pointerdown', function (e) {
+      if (!imgViewActive()) return;
+      touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(touchPts).length !== 2) return;
+      cancelStroke();
+      DRAW.panning = false; DRAW.panFrom = null;
+      $('#stageSvg').classList.remove('is-panning');
+      DRAW.pinching = true;
+      var t = twoFinger();
+      pinch = { d: t.d, s: viewScale(), cx: t.cx, cy: t.cy };
+    }, true);
+
+    /* 收尾必须挂 window：手指在画布外抬起时，board 根本收不到 pointerup，
+       残留的指针会让「双指还在」这个状态一直挂着，之后单指一划就乱缩放。 */
+    board.addEventListener('pointermove', function (e) {
+      if (!touchPts[e.pointerId]) return;
+      touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (!pinch) return;
+      var t = twoFinger();
+      if (!t) return;
+      e.preventDefault();
+      /* 中点位移当平移：一边放大，一边把两指夹住的那块地方拖回来 */
+      board.scrollLeft -= (t.cx - pinch.cx);
+      board.scrollTop -= (t.cy - pinch.cy);
+      pinch.cx = t.cx; pinch.cy = t.cy;
+      setScale(pinch.s * (t.d / pinch.d), { x: t.cx, y: t.cy });
+    }, { capture: true, passive: false });
+
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      window.addEventListener(ev, function (e) {
+        if (!touchPts[e.pointerId]) return;
+        delete touchPts[e.pointerId];
+        if (Object.keys(touchPts).length < 2) { pinch = null; DRAW.pinching = false; }
+      }, true);
+    });
+
+    /* 桌面：Ctrl / ⌘ + 滚轮按光标位置缩放，普通滚轮照旧滚动。
+       passive:false 不能省，否则 preventDefault 无效、页面会跟着一起缩放。 */
+    board.addEventListener('wheel', function (e) {
+      if (!imgViewActive() || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12, { x: e.clientX, y: e.clientY });
+    }, { passive: false });
+
     /* 截图后直接 Ctrl + V —— 这是最顺手的入口 */
     document.addEventListener('paste', function (e) {
       var f = imageFromClipboard(e.clipboardData);
@@ -4803,7 +5047,7 @@ textarea.dlg-finput{min-height:74px;}
     });
 
     window.addEventListener('resize', function () {
-      if (STATE.doc && STATE.doc.kind === 'image') fitHolder();
+      if (STATE.doc && STATE.doc.kind === 'image') applyView();
     });
 
     /* 点击空白收起浮动条 */
@@ -4905,6 +5149,7 @@ textarea.dlg-finput{min-height:74px;}
     STATE.mode = defaultModeFor(STATE.doc);
 
     bindEvents();
+    resetZoomDefault();
     renderAll();
     setDirty(false);
     setMView('main');
@@ -5008,6 +5253,17 @@ textarea.dlg-finput{min-height:74px;}
     ptsAttr: ptsAttr,
     renderImgStage: renderImgStage,
     renderImgTools: renderImgTools,
+    applyView: applyView,
+    fitScale: fitScale,
+    viewScale: viewScale,
+    setScale: setScale,
+    zoomBy: zoomBy,
+    zoomToFit: zoomToFit,
+    zoomToActual: zoomToActual,
+    imgZoomAction: imgZoomAction,
+    resetZoomDefault: resetZoomDefault,
+    syncZoomUI: syncZoomUI,
+    imgViewActive: imgViewActive,
     paintMarks: paintMarks,
     openImgComposer: openImgComposer,
     commitImgComposer: commitImgComposer,
@@ -5167,6 +5423,139 @@ textarea.dlg-finput{min-height:74px;}
     T('B9 SVG viewBox 与图片原始尺寸一致',
       document.getElementById('stageSvg').getAttribute('viewBox'),
       '0 0 ' + doc.image.w + ' ' + doc.image.h);
+
+    /* ---------- Z. 缩放 ----------
+       这一节要盯两件事：
+       一是「传入图被压缩」这个真 bug —— 它压根不在缩放逻辑里，
+         而是卡片作为纵向 flex 子项被 flex-shrink 压扁把图挤变形，
+         所以断言一律打在 getBoundingClientRect（渲染尺寸）上，只看 style.height 是瞎的。
+       二是缩放不能改写「屏幕坐标 → 归一化坐标」的换算，否则症状是标注整体跑偏。 */
+    var holder = document.getElementById('imgHolder');
+    var board = document.getElementById('imgBoard');
+    var imgW = doc.image.w, imgH = doc.image.h;
+
+    T('Z1 桌面默认 1:1 原尺寸打开（不压缩）', Q.DRAW.zoomFit, false);
+    T('Z2 默认倍率就是 100%', Q.viewScale(), 1);
+    var box0 = holder.getBoundingClientRect();
+    T('Z3 画布渲染尺寸等于图片原始像素',
+      [Math.round(box0.width), Math.round(box0.height)], [imgW, imgH]);
+    T('Z4 宽高比与原图一致',
+      Math.round(box0.width / box0.height * 100), Math.round(imgW / imgH * 100));
+
+    /* 复现用户报的那张图：长图（远高于画布）打开时的比例失真 */
+    var keepImgH = Q.STATE.doc.image.h;
+    Q.STATE.doc.image.h = keepImgH * 4;
+    Q.applyView();
+    var tallBox = holder.getBoundingClientRect();
+    T('Z5 长图不被压扁：渲染高度跟得上设定高度',
+      Math.round(tallBox.height), Math.round(keepImgH * 4 * Q.viewScale()));
+    near('Z6 长图渲染后的宽高比仍是原比例',
+      tallBox.width / tallBox.height, Q.STATE.doc.image.w / Q.STATE.doc.image.h, 0.02);
+    T('Z7 长图高过画布时画布可纵向滚动',
+      board.scrollHeight > board.clientHeight, true);
+    Q.STATE.doc.image.h = keepImgH;
+    Q.applyView();
+
+    /* 「适应」只缩不放：小图不会被拉大发虚 */
+    T('Z8 适应倍率封顶 100%', Q.fitScale() <= 1, true);
+    var keepImgW = Q.STATE.doc.image.w;
+    Q.STATE.doc.image.w = 6000;          /* 假装来了一张远宽于画布的图 */
+    var wideFit = Q.fitScale();
+    Q.STATE.doc.image.w = keepImgW;
+    T('Z9 超宽图的适应倍率小于 100%', wideFit > 0 && wideFit < 1, true);
+
+    /* 倍率上下限：再乱按也不会缩到看不见、也不会放大到只剩马赛克 */
+    Q.setScale(0.01);
+    T('Z10 缩小有下限', Q.viewScale(), 0.15);
+    Q.setScale(99);
+    T('Z11 放大到上限被夹住', Q.viewScale(), 8);
+    Q.setScale(2);
+    T('Z12 放大后画布按倍率变大',
+      Math.round(holder.getBoundingClientRect().width), Math.round(imgW * 2));
+    var z12 = holder.getBoundingClientRect();
+    T('Z13 放大后仍保持原比例',
+      Math.round(z12.width / z12.height * 100), Math.round(imgW / imgH * 100));
+
+    /* 关键回归：缩放只改显示，不改坐标换算。
+       哪天有人图省事拿 clientX 直接除以图片原始宽度，这里立刻红。 */
+    var marksBefore = Q.STATE.doc.marks.length;
+    Q.DRAW.tool = 'rect';
+    dragNorm(0.25, 0.30, 0.60, 0.55);
+    var zoomMark = Q.STATE.doc.marks[Q.STATE.doc.marks.length - 1];
+    T('Z14 2 倍缩放下照样能画', Q.STATE.doc.marks.length, marksBefore + 1);
+    near('Z15 2 倍缩放下 x0 换算依然准确', zoomMark.geo.x0, 0.25, 0.02);
+    near('Z16 2 倍缩放下 y1 换算依然准确', zoomMark.geo.y1, 0.55, 0.02);
+    Q.undoMark();
+
+    /* 平移：只挪画面，不落笔。放大后没有它就没法把切到画外的手指挪回来 */
+    Q.setScale(3);
+    board.scrollLeft = 0; board.scrollTop = 0;
+    Q.DRAW.tool = 'pan';
+    var nBeforePan = Q.STATE.doc.marks.length;
+    dragNorm(0.70, 0.70, 0.25, 0.25, 4);
+    T('Z17 平移工具不产生标注', Q.STATE.doc.marks.length, nBeforePan);
+    T('Z18 平移真的把画面挪动了', board.scrollTop > 0 && board.scrollLeft > 0, true);
+    T('Z19 图比画布大时贴左上（溢出可滚到）', parseFloat(holder.style.marginLeft), 0);
+    T('Z20 溢出时不再插入空白居中', parseFloat(holder.style.marginTop), 0);
+
+    /* 工具栏读数 + 按钮 */
+    T('Z21 工具条里有平移工具',
+      !!document.querySelector('#imgTools [data-tool="pan"]'), true);
+    /* 图标从 ICONS 取不到时会拼成字面量 "undefined"（不报错，只是难看），
+       实证抓一次：工具条里出现 undefined 就是漏配了图标。 */
+    T('Z22 工具条里没有 undefined（图标没漏配）',
+      document.getElementById('imgTools').textContent.indexOf('undefined'), -1);
+    T('Z23 每个工具按钮都带图标',
+      Array.prototype.every.call(document.querySelectorAll('#imgTools [data-tool]'), function (b) {
+        return !!b.querySelector('svg');
+      }), true);
+    T('Z24 工具有缩放读数', !!document.getElementById('imgZoomPct'), true);
+    T('Z25 工具条里有「适应」按钮', !!document.getElementById('imgZoomFit'), true);
+    Q.setScale(2.5);
+    T('Z26 读数跟随倍率', document.getElementById('imgZoomPct').textContent, '250%');
+    Q.zoomToFit();
+    T('Z27「适应」按钮在适应态高亮',
+      document.getElementById('imgZoomFit').classList.contains('is-on'), true);
+    T('Z28「适应」把整图收进画布宽度',
+      holder.getBoundingClientRect().width <= board.clientWidth, true);
+    Q.zoomToActual();
+    T('Z29 100% 按钮回到原尺寸', Q.viewScale(), 1);
+    T('Z30 回到 100% 后按钮不再高亮',
+      document.getElementById('imgZoomFit').classList.contains('is-on'), false);
+
+    /* 捏合：手机上最顺手的放大方式，必须真的能改倍率。
+       注意 pointerup 要派发到 window —— 手指在画布外抬起时 board 收不到。 */
+    function pinchEv(id, x, y, type) {
+      return new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: id, pointerType: 'touch',
+        isPrimary: id === 1, clientX: x, clientY: y
+      });
+    }
+    Q.setScale(1);
+    var br = board.getBoundingClientRect();
+    var px = br.left + 140, py = br.top + 160;
+    board.dispatchEvent(pinchEv(1, px - 40, py, 'pointerdown'));
+    board.dispatchEvent(pinchEv(2, px + 40, py, 'pointerdown'));
+    var s0 = Q.viewScale();
+    board.dispatchEvent(pinchEv(1, px - 80, py, 'pointermove'));
+    board.dispatchEvent(pinchEv(2, px + 80, py, 'pointermove'));
+    T('Z32 双指拉开就放大', Q.viewScale() > s0, true);
+    board.dispatchEvent(pinchEv(1, px - 160, py, 'pointermove'));
+    board.dispatchEvent(pinchEv(2, px + 160, py, 'pointermove'));
+    T('Z33 拉开越多放得越大', Q.viewScale() > s0 * 2, true);
+    window.dispatchEvent(pinchEv(2, px + 160, py, 'pointerup'));
+    var sAfter = Q.viewScale();
+    window.dispatchEvent(pinchEv(1, px - 400, py, 'pointermove'));
+    T('Z34 收掉一指后捏合立刻结束（不会单指乱缩放）', Q.viewScale(), sAfter);
+    window.dispatchEvent(pinchEv(1, px - 400, py, 'pointerup'));
+    T('Z35 捏合收尾后状态复位', Q.DRAW.pinching, false);
+
+    /* 收尾：回到默认倍率，后面的绘制用例从干净状态起步 */
+    Q.resetZoomDefault();
+    Q.applyView();
+    board.scrollLeft = 0; board.scrollTop = 0;
+    T('Z31 收起缩放后回到该设备的默认倍率', Q.viewScale(), 1);
+    Q.DRAW.tool = 'rect';
 
     /* ---------- C. 屏幕坐标 → 归一化坐标（最关键的一条） ---------- */
     Q.DRAW.tool = 'rect';
