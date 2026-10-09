@@ -1,0 +1,41 @@
+ALL_PASS
+PASS  A1 片段数量（文本+表情+文本 = 3）
+PASS  A2 片段1 原文区间
+PASS  A3 片段1 内容
+PASS  A4 片段2 是表情
+PASS  A5 片段2 原文区间覆盖整个 [微笑]
+PASS  A6 片段2 渲染为图标而非字面量
+PASS  A7 片段3 原文区间
+PASS  A8 各片段拼回等于原文
+PASS  B1 文本内拖选 晚7点
+PASS  B2 取到的 quote 正确
+PASS  C1 从「晚」拖到「学」→ 跨过表情
+PASS  C2 quote 含表情字面量
+PASS  D1 单独选中表情 → 覆盖其完整原文区间
+PASS  D2 quote 就是字面量
+PASS  E1 全选 → 0 到 13
+PASS  F1 选区跨段落不报错且端点正确
+PASS  F2 首尾空白已被裁掉
+PASS  G1 三种表情都渲染成图标
+PASS  G2 所有片段拼回等于原文
+PASS  H1 每个表情片段的原文区间都切到合法字面量
+PASS  I1 被批注的文字出现高亮
+PASS  I2 用 [data-ann~=id] 能反查到正文片段
+PASS  I3 反查到的正是被批注那段
+PASS  J1 重叠区域被标为多批注覆盖
+PASS  K1 浮动工具条已弹出
+PASS  K2 六种批注类型都渲染出来
+PASS  K3 第一个类型是错别字
+PASS  K4 点击类型后展开输入表单
+PASS  K5 表单回显选中的原文
+PASS  K6 提供了话术模板
+PASS  K7 模板点击可插入
+PASS  K8 提交后新增了一条批注
+PASS  K9 类型是「表情」
+PASS  K10 锚点区间正确
+PASS  K11 原文快照正确
+PASS  K12 提交后工具条自动收起
+PASS  K13 正文里出现了对应高亮
+PASS  K14 侧栏出现对应卡片
+PASS  K15 侧栏卡片显示的是同一条
+PASS  K16 空意见被拦下，不生成批注

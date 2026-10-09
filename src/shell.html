@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>QQ 推送批改助手</title>
+<script>
+/* 主题要在首帧之前定下来，否则深色模式会先闪一下白。
+   这里只读 localStorage，不依赖任何后续脚本。 */
+(function () {
+  var t = 'light';
+  try {
+    var s = JSON.parse(localStorage.getItem('qqpc:settings') || '{}');
+    if (s && s.theme === 'dark') t = 'dark';
+    else if (s && s.theme === 'light') t = 'light';
+    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+  } catch (e) {}
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body data-mview="main">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z"/></svg>
+    </span>
+    <span class="brand-text">QQ 推送批改助手</span>
+  </div>
+
+  <input id="docTitle" class="title-input" type="text" placeholder="未命名推送" autocomplete="off" aria-label="推送标题">
+  <span id="saveHint" class="save-hint">已保存</span>
+  <span class="grow"></span>
+
+  <button id="btnSave" class="btn btn-save" type="button" title="保存（Ctrl + S）" disabled>
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
+    <span class="btn-txt">保存</span>
+  </button>
+
+  <button id="btnTheme" class="icon-btn" type="button" title="切换深色 / 浅色" aria-label="切换主题">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+  </button>
+
+  <div class="menu-wrap">
+    <button id="btnExport" class="btn btn-primary" type="button">
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <span class="btn-txt">导出</span>
+    </button>
+    <div id="exportMenu" class="menu hidden"></div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <aside class="col col-left">
+    <div class="col-head">
+      <span class="col-title">文档</span>
+      <span id="docCount" class="badge-soft">0</span>
+      <span class="grow"></span>
+    </div>
+
+    <div class="new-row">
+      <button id="btnNewImg" class="new-btn is-primary" type="button" title="默认方式：把推送截图放进来，直接在图上圈点勾画">
+        <span class="new-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.6" cy="8.6" r="1.5"/><path d="m21 15.5-4.6-4.6L5 21"/></svg>
+        </span>
+        <span class="new-txt">图片批改</span>
+      </button>
+      <button id="btnNew" class="new-btn" type="button" title="粘贴 QQ 推送原文，按文字逐句批改">
+        <span class="new-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
+        </span>
+        <span class="new-txt">文字推送</span>
+      </button>
+    </div>
+
+    <div id="docList" class="doc-list"></div>
+
+    <div class="who-foot">
+      <button id="btnWho" class="who is-empty" type="button" title="设置批注人">
+        <span id="whoAvatar" class="avatar">＋</span>
+        <span id="whoName" class="who-name">批注人</span>
+        <span class="grow"></span>
+        <svg class="i who-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>
+      </button>
+      <div id="whoPop" class="pop hidden">
+        <div class="pop-title">批注人</div>
+        <div class="pop-row">
+          <span id="whoAvatarBig" class="avatar avatar-lg">＋</span>
+          <input id="whoInput" class="pop-input" type="text" maxlength="12" placeholder="填写你的姓名" autocomplete="off">
+        </div>
+        <div class="pop-hint">批改稿上会署名；头像取姓名的后两个字。</div>
+        <div class="pop-actions">
+          <button id="whoClear" class="btn-sm" type="button">清空</button>
+          <button id="whoSave" class="btn-sm primary" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="col col-center">
+    <div class="tabs">
+      <div class="segmented" role="tablist">
+        <button class="tab" type="button" data-mode="edit" role="tab">编辑</button>
+        <button class="tab is-active" type="button" data-mode="annotate" role="tab">批注</button>
+        <button class="tab" type="button" data-mode="preview" role="tab">预览</button>
+      </div>
+      <span class="grow"></span>
+      <span id="modeHint" class="muted-sm">拖选正文文字即可添加批注</span>
+    </div>
+    <div id="canvasWrap" class="canvas-wrap">
+      <div id="bubble" class="bubble"></div>
+      <textarea id="editor" class="editor hidden" spellcheck="false"
+        placeholder="把干事发来的 QQ 推送原文粘贴到这里。"></textarea>
+      <div id="floatingBar" class="floating-bar hidden"></div>
+
+      <!-- 图片批改：截图 + 圈点勾画 -->
+      <div id="imgStage" class="img-stage hidden">
+        <div id="imgTools" class="img-tools"></div>
+        <div id="imgBoard" class="img-board">
+          <div id="imgDrop" class="img-drop">
+            <div class="img-drop-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4.5"/><circle cx="8.6" cy="8.6" r="1.6"/><path d="m21 15.5-4.6-4.6L5 21"/></svg>
+            </div>
+            <div id="imgDropTitle" class="img-drop-t">把 QQ 推送的截图放进来</div>
+            <div id="imgDropSub" class="img-drop-s">拖拽图片到这里 · 或直接 Ctrl + V 粘贴 · 或点下面按钮选择</div>
+            <button id="btnPickImg" class="btn-sm primary" type="button">选择图片</button>
+          </div>
+          <div id="imgHolder" class="img-holder hidden">
+            <img id="stageImg" alt="推送截图">
+            <svg id="stageSvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+        </div>
+        <div id="imgComposer" class="img-composer hidden"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="col col-right">
+    <div class="col-head">
+      <span class="col-title">批注</span>
+      <span id="annCount" class="badge">0</span>
+      <span class="grow"></span>
+      <select id="filterSel" class="mini-select" aria-label="筛选批注">
+        <option value="all">全部</option>
+        <option value="open">未解决</option>
+        <option value="done">已解决</option>
+        <option value="typo">错别字</option>
+        <option value="wording">措辞</option>
+        <option value="format">格式</option>
+        <option value="emoji">表情</option>
+        <option value="praise">赞赏</option>
+        <option value="general">整体</option>
+      </select>
+    </div>
+    <div id="annList" class="ann-list"></div>
+  </aside>
+
+</main>
+
+<nav class="mnav">
+  <button type="button" data-mview="docs">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>
+    <span>文档</span>
+  </button>
+  <button type="button" data-mview="main" class="is-on">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    <span>批改</span>
+  </button>
+  <button type="button" data-mview="ann">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z"/></svg>
+    <span>批注</span>
+  </button>
+</nav>
+
+<input id="imgFile" class="hidden" type="file" accept="image/*">
+<input id="jsonFile" class="hidden" type="file" accept=".json,application/json">
+
+<!-- 通用确认弹窗：替代原生 confirm，样式和主题一致 -->
+<div id="dlg" class="dlg hidden" aria-hidden="true">
+  <div class="dlg-mask" data-dlg-act="cancel"></div>
+  <div class="dlg-card" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <div class="dlg-body">
+      <div id="dlgTitle" class="dlg-title"></div>
+      <div id="dlgMsg" class="dlg-msg"></div>
+    </div>
+    <div id="dlgActs" class="dlg-acts"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>

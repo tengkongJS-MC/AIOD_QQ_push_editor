@@ -1,0 +1,104 @@
+ALL_PASS
+PASS  A1 data-theme 落到 <html> 上
+PASS  A2 主题已持久化
+PASS  A3 深色下 --bg-grouped 是纯黑底
+PASS  A4 深色下 --label-primary 是纯白字
+PASS  A4b 深色下浮起层不是纯黑（靠亮度差分层）
+PASS  A5 浅色下 --bg-grouped 与深色不同
+PASS  A6 浅色下 --label-primary 与深色不同
+PASS  A6b 浅色下 --bg-grouped 是苹果分组灰 #F2F2F7
+PASS  A6c 强调色是系统蓝 #007AFF
+PASS  A6d 字体栈优先系统字体
+PASS  A7 body 实际底色随主题变化
+PASS  A8 深色底确实是暗的
+PASS  A9 主题按钮图标随主题切换
+PASS  A10 深色时按钮提示"切换为浅色"
+PASS  A11 toggle 切到深色
+PASS  A12 toggle 切回浅色
+PASS  A13 loadSettings 能把主题读回来
+PASS  B1 空名字给占位符
+PASS  B2 一个字的姓名直接用
+PASS  B3 两个字直接用全名
+PASS  B4 三个字取后两个字
+PASS  B5 四字复姓也取后两个字
+PASS  B6 英文名取后两字符
+PASS  B7 首尾空格被忽略
+PASS  C1 姓名写入设置
+PASS  C2 顶栏头像显示后两个字
+PASS  C3 弹层里的大头像同步
+PASS  C4 顶栏显示全名
+PASS  C5 有名字时不再是空态
+PASS  C6 已落盘
+PASS  C7 annotatorName() 与设置一致
+PASS  C8 清空后回到空态
+PASS  C9 清空后头像变占位符
+PASS  C10 超长名字被截到 12 字
+PASS  C11 批注人入口在左栏底部
+PASS  C12 入口排在文档列表之后
+PASS  C13 顶栏不再有批注人入口
+PASS  C14 弹层跟入口在一起
+PASS  D1 文字批注记住了批注人
+PASS  D2 文字批改稿抬头有署名
+PASS  D3 批改稿仍是自包含单文件
+PASS  D4 图片标注也记住了批注人
+PASS  E1 body[data-mview] 记下当前视图
+PASS  E2 对应导航按钮高亮
+PASS  E3 其他按钮不高亮
+PASS  E4 切到批注视图
+PASS  E5 高亮跟着走
+PASS  E6 非法值回落到主视图
+PASS  E7 底部导航有三个入口
+PASS  E8 底部导航图标是 SVG
+PASS  F1 顶栏导出按钮带图标
+PASS  F2 主题按钮带图标
+PASS  F3 新建按钮带图标
+PASS  F4 导出菜单每项都有图标（8 项 8 图）
+PASS  F5 图片工具栏图标化
+PASS  F6 工具栏不再用字符图标
+PASS  F7 七个工具各自带图标
+PASS  F8 撤销图标是回退箭头（不是缺口圆圈）
+PASS  F9 颜色有且只有一个选中
+PASS  F10 选中的就是当前颜色
+PASS  F11 粗细有且只有一个选中
+PASS  F12 选中的就是当前粗细
+PASS  F13 色块之间留出了呼吸位
+PASS  F8 侧栏卡片仍能渲染
+PASS  G1 新建入口在左栏内部
+PASS  G2 新建入口排在文档列表之前
+PASS  G3 两个入口在同一个新建区里
+PASS  G4 左栏顶部就是新建区（第一屏可见）
+PASS  G5 图片批改排在新入口第一位
+PASS  G6 图片批改是主推样式（实心强调色）
+PASS  G7 默认草稿就是图片批改
+PASS  G8 默认草稿还没图，所以先落在编辑态
+PASS  H1 没有改动时保存按钮禁用
+PASS  H2 提示显示已保存
+PASS  H3 有改动后按钮可用
+PASS  H4 提示变成未保存
+PASS  H5 只是标了脏，还没落盘
+PASS  H6 没落盘也就读不出来
+PASS  H7 保存后写进了本地存储
+PASS  H8 保存后进了文档列表索引
+PASS  H9 保存后按钮回到禁用
+PASS  H10 提示回到已保存
+PASS  H11 未落盘的草稿也会显示在列表里
+PASS  I1 没有改动时不打断，直接执行
+PASS  I2 有改动时先弹窗，不直接执行
+PASS  I3 弹窗已打开
+PASS  I4 弹窗标题
+PASS  I5 给出三个选择
+PASS  I6 主操作是「保存」
+PASS  I7 危险操作是「不保存」
+PASS  I8 选「保存」后动作被执行
+PASS  I9 弹窗已关闭
+PASS  I10 保存完不再 dirty
+PASS  I11 保存按钮回到禁用
+PASS  I12 选「取消」时不执行动作
+PASS  I13 取消后仍然保持未保存
+PASS  I14 弹窗已收起
+PASS  J1 主题复位
+PASS  J2 批注人复位
+  PASS  静态检查 · 不再使用原生 confirm()
+  PASS  静态检查 · 不再使用原生 prompt()
+  PASS  静态检查 · 不再内置示例数据 SAMPLE_RAW
+  PASS  静态检查 · 启动不再播种示例文档

@@ -1,0 +1,79 @@
+ALL_PASS
+PASS  A1 文字文档：PDF 提供整体批注式
+PASS  A2 文字文档：PDF 提供段后批注式
+PASS  A3 文字文档：长图提供整体批注式
+PASS  A4 文字文档：长图提供段后批注式
+PASS  A5 文字文档不再出现写死的老按钮
+PASS  B1 文档类型已切换为图片
+PASS  B2 图片长边被压到 1500 以内
+PASS  B3 尺寸按原比例保留（600×400 → 3:2）
+PASS  B4 标题取自文件名
+PASS  B5 导入后自动进入批注模式
+PASS  B6 画布已显示
+PASS  B7 工具栏已显示
+PASS  B8 上传区已隐藏
+PASS  B9 SVG viewBox 与图片原始尺寸一致
+PASS  C1 画出一个标注
+PASS  C2 工具记录正确
+PASS  C3 颜色记录正确
+PASS  C4 x0 换算准确
+PASS  C5 y0 换算准确
+PASS  C6 x1 换算准确
+PASS  C7 y1 换算准确
+PASS  C8 左上角被规范化为较小值
+PASS  C9 位置描述落在左上
+PASS  C10 意见框自动弹出（画完就能写）
+PASS  C11 画完还没写意见，所以不进清单
+PASS  D1 意见已写入标注
+PASS  D2 建议改法已写入
+PASS  D3 类型已写入
+PASS  D4 保存后意见框收起
+PASS  D5 这条标注进入清单
+PASS  D6 侧栏出现卡片
+PASS  D7 卡片显示位置提示
+PASS  D8 卡片显示意见内容
+PASS  D9 图上出现编号徽标
+PASS  D10 徽标编号为 1
+PASS  D11 导入图片本身已立即落盘
+PASS  D12 刚导入时文档列表统计为 0 条
+PASS  D13 画完标注后处于「未保存」
+PASS  D14 未保存时统计仍未更新
+PASS  D15 保存后统计为 1 条批注
+PASS  D16 文档列表标记为图片类型
+PASS  D17 保存后回到「已保存」
+PASS  E1 画笔生成了标注
+PASS  E2 记录为画笔
+PASS  E3 采到了多个路径点
+PASS  E4 路径点也是归一化坐标
+PASS  E5 画笔划线也自动弹意见框
+PASS  E6 意见框挂在刚画的那条线上
+PASS  E7 还没写意见，所以不进清单
+PASS  E8 拖拽途中预览层已出现折线
+PASS  E9 预览折线坐标不含 NaN
+PASS  E10 收尾撤销后标注数复原
+PASS  F1 记录为高亮
+PASS  F2 高亮存方框对角（不是路径点）
+PASS  F3 高亮渲染为半透明矩形
+PASS  F4 高亮不再渲染成折线
+PASS  F5 高亮框画完也自动弹意见框
+PASS  F6 意见框挂在刚画的高亮框上
+PASS  G1 能在图上找到该标注的图形
+PASS  G2 点选后意见框打开
+PASS  G3 意见框回显已有意见
+PASS  G4 点击卡片也能选中图形（侧栏联动）
+PASS  H1 撤销后只剩两条
+PASS  H2 连续撤销到空
+PASS  H3 空撤销不报错
+PASS  I1 仅标注图尺寸等于原图
+PASS  I2 带意见清单时高度增加
+PASS  I3 宽度保持不变
+PASS  I4 图下意见清单确实画上了
+PASS  J1 图片文档导出菜单含「标注 + 意见清单」
+PASS  J2 图片文档导出菜单含「仅标注图形」
+PASS  J3 图片文档导出菜单含打印 PDF
+PASS  J4 图片文档不再出现文字批注稿选项
+PASS  J5 图片文档含「两侧索引线」
+PASS  J6 图片文档含「就近索引」
+PASS  K1 文字文档仍能正常渲染正文片段
+PASS  K2 图片画布已隐藏
+PASS  K3 导出菜单切回文字版

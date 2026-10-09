@@ -1,0 +1,14 @@
+  PASS  仅标注图尺寸等于原图 (620×920 vs 620×920)
+  PASS  带清单时宽度不变
+  PASS  带清单时高度增加 (1456 > 920)
+  PASS  导出过程不会顺手清空标注（{"pre":{"mk":6,"note":6},"mid":{"mk":6,"note":6}}）
+  PASS  仅标注图已落盘
+  PASS  含意见清单的图已落盘
+  PASS  两侧索引图比原图宽（留出了左右栏）(1168 > 620)
+  PASS  两侧索引图已落盘
+  PASS  就近索引图已落盘，且宽度略大于原图 (1108 >= 620)
+
+仅标注图      291 KB  → src/_tmp/out/imgdoc-仅标注图.png
+含意见清单    354 KB  → src/_tmp/out/imgdoc-含意见清单.png
+两侧索引图    375 KB  → src/_tmp/out/imgdoc-两侧索引图.png  (1168×1017)
+就近索引图    372 KB  → src/_tmp/out/imgdoc-就近索引图.png  (1108×1001)

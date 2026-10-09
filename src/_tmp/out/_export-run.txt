@@ -1,0 +1,27 @@
+示例批注挂载数：6 / 6
+编号清单式：6.3 KB
+段后批注式：5.8 KB
+  PASS  清单式 · 完整 HTML 文档
+  PASS  清单式 · 内联样式（无外部依赖）
+  PASS  清单式 · 无外部脚本
+  PASS  清单式 · 含标题
+  PASS  清单式 · 含批注人署名
+  PASS  清单式 · 含批注条数统计
+  PASS  清单式 · 样式走系统字体栈
+  PASS  清单式 · 强调色为系统蓝 #007AFF
+  PASS  清单式 · 标题带负字距
+  PASS  清单式 · 正文 17px
+  PASS  清单式 · 不含旧版 QQ 蓝
+  PASS  段后式 · 完整 HTML 文档
+  PASS  段后式 · 内联样式（无外部依赖）
+  PASS  段后式 · 无外部脚本
+  PASS  段后式 · 含标题
+  PASS  段后式 · 含批注人署名
+  PASS  段后式 · 含批注条数统计
+  PASS  段后式 · 样式走系统字体栈
+  PASS  段后式 · 强调色为系统蓝 #007AFF
+  PASS  段后式 · 标题带负字距
+  PASS  段后式 · 正文 17px
+  PASS  段后式 · 不含旧版 QQ 蓝
+截图 → src/_tmp/out/export-list.png
+截图 → src/_tmp/out/export-inline.png
